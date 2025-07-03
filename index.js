@@ -7,11 +7,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Fix preflight CORS: trả về 200 cho mọi OPTIONS request
-app.options('/api/*', (req, res) => {
-  res.sendStatus(200);
-});
-
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected!'))
