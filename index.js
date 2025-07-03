@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json());
 
 // Fix preflight CORS: trả về 200 cho mọi OPTIONS request
-app.options('*', (req, res) => {
+app.options('/api/*', (req, res) => {
   res.sendStatus(200);
 });
 
