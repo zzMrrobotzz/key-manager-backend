@@ -118,6 +118,7 @@ app.post('/api/keys/use-credit', async (req, res) => {
 
 // API tạo đơn hàng PayOS
 app.post('/api/payment/create', async (req, res) => {
+  console.log('Received /api/payment/create', req.body); // Log đầu vào để debug
   const { key, credit } = req.body;
   if (!key || !credit || credit < 1) {
     return res.status(400).json({ success: false, message: 'Thiếu key hoặc số credit không hợp lệ' });
