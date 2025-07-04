@@ -147,7 +147,18 @@ app.post('/api/payment/create', async (req, res) => {
       webhookUrl
     };
     // Tạo signature (checksum) đúng thứ tự PayOS
-    const rawSignature = `${orderId}${amount}${description}${returnUrl}${returnUrl}${key}''''${PAYOS_CLIENT_ID}${webhookUrl}${PAYOS_API_KEY}`;
+    const rawSignature =
+      String(orderId) +
+      String(amount) +
+      String(description) +
+      String(returnUrl) +
+      String(returnUrl) + // cancelUrl
+      String(key) +       // buyerName
+      '' +                // buyerEmail
+      '' +                // buyerPhone
+      String(PAYOS_CLIENT_ID) +
+      String(webhookUrl) +
+      String(PAYOS_API_KEY);
     payload.signature = crypto.createHmac('sha256', PAYOS_CHECKSUM_KEY).update(rawSignature).digest('hex');
 
     // Gọi PayOS (giả sử dùng axios)
