@@ -118,52 +118,62 @@ app.post('/api/keys/use-credit', async (req, res) => {
 
 // API tạo đơn hàng PayOS
 app.post('/api/payment/create', async (req, res) => {
-  console.log('Received /api/payment/create', req.body); // Log đầu vào để debug
-  const { key, credit } = req.body;
-  if (!key || !credit || credit < 1) {
-    return res.status(400).json({ success: false, message: 'Thiếu key hoặc số credit không hợp lệ' });
-  }
-  // Tính số tiền (VD: 1 credit = 1000 VND)
-  const amount = credit * 1000;
-  const orderId = 'ORDER-' + Date.now() + '-' + Math.floor(Math.random()*10000);
-  const description = `Nạp ${credit} credit cho key ${key}`;
-  const returnUrl = 'https://admintoolviettruyen.netlify.app'; // URL trả về sau khi thanh toán
-  const webhookUrl = process.env.PAYOS_WEBHOOK_URL || 'https://key-manager-backend.onrender.com/api/payment/webhook';
-
-  // Tạo payload
-  const payload = {
-    orderCode: orderId,
-    amount,
-    description,
-    returnUrl,
-    cancelUrl: returnUrl,
-    buyerName: key,
-    buyerEmail: '',
-    buyerPhone: '',
-    clientId: PAYOS_CLIENT_ID,
-    signature: '', // sẽ tính sau
-    webhookUrl
-  };
-  // Tạo signature (checksum)
-  const rawSignature = `${orderId}${amount}${description}${returnUrl}${webhookUrl}${PAYOS_API_KEY}`;
-  payload.signature = crypto.createHmac('sha256', PAYOS_CHECKSUM_KEY).update(rawSignature).digest('hex');
-
+  console.log('Received /api/payment/create', req.body);
   try {
-    const response = await axios.post(PAYOS_API_URL, payload, {
-      headers: {
-        'x-client-id': PAYOS_CLIENT_ID,
-        'x-api-key': PAYOS_API_KEY,
-        'Content-Type': 'application/json',
-      }
-    });
-    if (response.data && response.data.data && response.data.data.checkoutUrl) {
-      res.json({ success: true, payUrl: response.data.data.checkoutUrl });
-    } else {
-      res.status(500).json({ success: false, message: 'Không lấy được link thanh toán' });
+    // Log dữ liệu chuẩn bị gửi PayOS
+    const { key, credit } = req.body;
+    console.log('Chuẩn bị tạo đơn PayOS với key:', key, 'credit:', credit);
+    if (!key || !credit || credit < 1) {
+      return res.status(400).json({ success: false, message: 'Thiếu key hoặc số credit không hợp lệ' });
     }
+    // Tính số tiền (VD: 1 credit = 1000 VND)
+    const amount = credit * 1000;
+    const orderId = 'ORDER-' + Date.now() + '-' + Math.floor(Math.random()*10000);
+    const description = `Nạp ${credit} credit cho key ${key}`;
+    const returnUrl = 'https://admintoolviettruyen.netlify.app'; // URL trả về sau khi thanh toán
+    const webhookUrl = process.env.PAYOS_WEBHOOK_URL || 'https://key-manager-backend.onrender.com/api/payment/webhook';
+
+    // Tạo payload
+    const payload = {
+      orderCode: orderId,
+      amount,
+      description,
+      returnUrl,
+      cancelUrl: returnUrl,
+      buyerName: key,
+      buyerEmail: '',
+      buyerPhone: '',
+      clientId: PAYOS_CLIENT_ID,
+      signature: '', // sẽ tính sau
+      webhookUrl
+    };
+    // Tạo signature (checksum)
+    const rawSignature = `${orderId}${amount}${description}${returnUrl}${webhookUrl}${PAYOS_API_KEY}`;
+    payload.signature = crypto.createHmac('sha256', PAYOS_CHECKSUM_KEY).update(rawSignature).digest('hex');
+
+    // Gọi PayOS (giả sử dùng axios)
+    let payosRes;
+    try {
+      payosRes = await axios.post(PAYOS_API_URL, payload, {
+        headers: {
+          'x-client-id': PAYOS_CLIENT_ID,
+          'x-api-key': PAYOS_API_KEY,
+          'Content-Type': 'application/json',
+        }
+      });
+      console.log('PayOS response:', payosRes.data);
+    } catch (payosErr) {
+      console.error('Lỗi khi gọi PayOS:', payosErr?.response?.data || payosErr.message || payosErr);
+      throw payosErr;
+    }
+
+    // ... code xử lý tiếp ...
+    // Trả về cho frontend
+    res.json({ payUrl: payosRes.data?.checkoutUrl });
+    console.log('Trả về payUrl:', payosRes.data?.checkoutUrl);
   } catch (err) {
-    console.error('Lỗi tạo đơn hàng PayOS:', err.response?.data || err.message);
-    res.status(500).json({ success: false, message: 'Lỗi tạo đơn hàng PayOS', detail: err.response?.data || err.message });
+    console.error('Lỗi tạo đơn hàng PayOS:', err?.response?.data || err.message || err);
+    res.status(500).json({ message: 'Lỗi tạo đơn hàng PayOS', detail: err?.response?.data || err.message || err });
   }
 });
 
