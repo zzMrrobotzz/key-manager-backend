@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const { createAuditLog } = require('./utils/auditLogger');
 const ApiProvider = require('./models/ApiProvider');
 const Transaction = require('./models/Transaction');
+const AuditLog = require('./models/AuditLog'); // <--- DÒNG BỊ THIẾU
 
 // --- App & Middleware Setup ---
 const app = express();
