@@ -201,8 +201,11 @@ app.post('/api/payment/webhook', async (req, res) => {
                 return res.status(200).json({ message: 'Transaction already processed.' });
             }
 
-            await require('./models/Key').updateOne({ key }, { $inc: { credit: credit } });
+            // Sửa lỗi nghiêm trọng ở đây:
+            const Key = require('./models/Key');
+            await Key.updateOne({ key }, { $inc: { credit: credit } });
 
+            // Ghi nhận giao dịch
             const newTransaction = new Transaction({
                 orderId: orderCode,
                 amount,

@@ -1,17 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const CreditPackage = require('../models/CreditPackage');
-const AuditLog = require('../models/AuditLog'); // Để ghi log
-
-// Helper ghi log
-const createAuditLog = async (action, details = '', actor = 'Admin') => {
-  try {
-    const log = new AuditLog({ action, details, actor });
-    await log.save();
-  } catch (error) {
-    console.error('Failed to create audit log:', error);
-  }
-};
+const { createAuditLog } = require('../utils/auditLogger'); // Dùng hàm chung
 
 // GET /api/packages - Lấy tất cả gói cước
 router.get('/', async (req, res) => {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Key = require('../models/Key');
-const { createAuditLog } = require('../utils/auditLogger'); // Sẽ tạo file helper này sau
+const { createAuditLog } = require('../utils/auditLogger');
 
 // Helper sinh key ngẫu nhiên
 const generateKey = () => 'KEY-' + Math.random().toString(36).substr(2, 8).toUpperCase();
