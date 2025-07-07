@@ -67,6 +67,10 @@ const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 
 // --- API Endpoints ---
 
+// Router cho gói cước
+const packageRoutes = require('./routes/packages');
+app.use('/api/packages', packageRoutes);
+
 // GET /api/stats/dashboard - Lấy dữ liệu tổng quan cho dashboard
 app.get('/api/stats/dashboard', async (req, res) => {
   try {
