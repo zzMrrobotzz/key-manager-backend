@@ -5,15 +5,13 @@ const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto');
 
-// --- Import Models ---
-const Key = require('./models/Key');
+// --- Import Utils & Models ---
+const { createAuditLog } = require('./utils/auditLogger');
 const ApiProvider = require('./models/ApiProvider');
 const Transaction = require('./models/Transaction');
-const AuditLog = require('./models/AuditLog');
 
+// --- App & Middleware Setup ---
 const app = express();
-
-// --- Middlewares ---
 const corsOptions = {
   origin: 'https://keyadmintoolviettruyen.netlify.app',
   optionsSuccessStatus: 200
@@ -21,27 +19,14 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// --- MongoDB Connection ---
+// --- MongoDB Connection & Initialization ---
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
     console.log('MongoDB connected!');
-    initializeApiProviders(); // Khởi tạo dữ liệu API providers khi kết nối thành công
+    initializeApiProviders();
   })
   .catch(err => console.error('MongoDB connection error:', err));
 
-// --- Helper Functions ---
-const generateKey = () => 'KEY-' + Math.random().toString(36).substr(2, 8).toUpperCase();
-
-const createAuditLog = async (action, details = '', actor = 'System') => {
-  try {
-    const log = new AuditLog({ action, details, actor });
-    await log.save();
-  } catch (error) {
-    console.error('Failed to create audit log:', error);
-  }
-};
-
-// --- Initial Data Setup ---
 const initializeApiProviders = async () => {
   const providers = ['Gemini', 'OpenAI', 'Stability AI', 'ElevenLabs', 'DeepSeek'];
   try {
@@ -64,14 +49,16 @@ const PAYOS_API_KEY = '6c790eab-3334-4180-bf54-d3071ca7f277';
 const PAYOS_CHECKSUM_KEY = '271d878407a1020d240d9064d0bfb4300bfe2e02bf997bb28771dea73912bd55';
 const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 
-
-// --- API Endpoints ---
-
-// Router cho gói cước
+// --- API Routers ---
+const keyRoutes = require('./routes/keys');
 const packageRoutes = require('./routes/packages');
+app.use('/api/keys', keyRoutes);
 app.use('/api/packages', packageRoutes);
 
-// GET /api/stats/dashboard - Lấy dữ liệu tổng quan cho dashboard
+
+// --- General API Endpoints ---
+
+// Dashboard Stats
 app.get('/api/stats/dashboard', async (req, res) => {
   try {
     const today = new Date();
@@ -95,15 +82,14 @@ app.get('/api/stats/dashboard', async (req, res) => {
       billingStats: {
         totalRevenue: totalRevenue[0]?.total || 0,
         monthlyTransactions: monthlyTransactions,
-        // Các thông số khác có thể thêm sau
         pendingRevenue: 0, 
         successRate: 100 
       },
       apiUsageStats: {
         totalRequests: apiUsage[0]?.totalRequests || 0,
-        todayRequests: 0, // Cần cơ chế đếm request real-time hơn
-        averageCost: 0, // Cần tính toán phức tạp hơn
-        errorRate: 0 // Cần cơ chế ghi log lỗi
+        todayRequests: 0,
+        averageCost: 0,
+        errorRate: 0
       }
     });
   } catch (error) {
@@ -112,8 +98,7 @@ app.get('/api/stats/dashboard', async (req, res) => {
   }
 });
 
-
-// GET /api/providers - Lấy danh sách API providers
+// API Providers
 app.get('/api/providers', async (req, res) => {
     try {
         const providers = await ApiProvider.find();
@@ -123,7 +108,6 @@ app.get('/api/providers', async (req, res) => {
     }
 });
 
-// PUT /api/providers/:id - Cập nhật API provider
 app.put('/api/providers/:id', async (req, res) => {
     try {
         const { status } = req.body;
@@ -138,8 +122,7 @@ app.put('/api/providers/:id', async (req, res) => {
     }
 });
 
-
-// GET /api/audit-log - Lấy hoạt động gần đây
+// Audit Log
 app.get('/api/audit-log', async (req, res) => {
     try {
         const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(15);
@@ -149,14 +132,13 @@ app.get('/api/audit-log', async (req, res) => {
     }
 });
 
-// POST /api/usage/log - Ghi nhận việc sử dụng API từ client
+// API Usage Logging
 app.post('/api/usage/log', async (req, res) => {
     const { providerName, cost } = req.body;
     if (!providerName) {
         return res.status(400).json({ message: 'Thiếu tên nhà cung cấp' });
     }
     try {
-        // Cập nhật provider, tăng totalRequests và costToday
         await ApiProvider.updateOne(
             { name: providerName },
             { 
@@ -171,78 +153,7 @@ app.post('/api/usage/log', async (req, res) => {
     }
 });
 
-
-// --- Key Management APIs (Updated with Auditing) ---
-
-app.post('/api/keys', async (req, res) => {
-  const { expiredAt, maxActivations, note, credit } = req.body;
-  const newKeyString = generateKey();
-  const newKey = new Key({
-    key: newKeyString,
-    expiredAt,
-    maxActivations,
-    note,
-    credit: typeof credit === 'number' ? credit : 0,
-  });
-  await newKey.save();
-  await createAuditLog('CREATE_KEY', `Key ${newKeyString} created with ${credit || 0} credit.`, 'Admin');
-  res.status(201).json(newKey);
-});
-
-app.get('/api/keys', async (req, res) => {
-  const keys = await Key.find().sort({ createdAt: -1 });
-  res.json(keys);
-});
-
-app.post('/api/keys/revoke', async (req, res) => {
-  const { key } = req.body;
-  await Key.updateOne({ key }, { isActive: false });
-  await createAuditLog('REVOKE_KEY', `Key ${key} was revoked.`, 'Admin');
-  res.json({ success: true });
-});
-
-app.post('/api/keys/update-credit', async (req, res) => {
-  const { key, amount } = req.body;
-  if (typeof amount !== 'number') {
-    return res.status(400).json({ success: false, message: 'amount phải là số' });
-  }
-  const updatedKey = await Key.findOneAndUpdate({ key }, { $inc: { credit: amount } }, { new: true });
-  if (!updatedKey) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy key' });
-  }
-  const action = amount > 0 ? 'ADD_CREDIT' : 'REMOVE_CREDIT';
-  await createAuditLog(action, `${Math.abs(amount)} credit ${amount > 0 ? 'added to' : 'removed from'} key ${key}. New balance: ${updatedKey.credit}`, 'Admin');
-  res.json({ success: true, credit: updatedKey.credit });
-});
-
-// --- Validation and Usage APIs (No change needed for now) ---
-app.post('/api/validate', async (req, res) => {
-  const { key } = req.body;
-  const found = await Key.findOne({ key, isActive: true });
-  if (found) {
-    res.json({ valid: true, keyInfo: found });
-  } else {
-    res.json({ valid: false });
-  }
-});
-
-app.post('/api/keys/use-credit', async (req, res) => {
-  const { key } = req.body;
-  const found = await Key.findOne({ key, isActive: true });
-  if (!found) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy key' });
-  }
-  if ((found.credit || 0) < 1) {
-    return res.status(400).json({ success: false, message: 'Hết credit' });
-  }
-  found.credit -= 1;
-  await found.save();
-  res.json({ success: true, credit: found.credit });
-});
-
-
-// --- Payment APIs (Updated with Auditing and Transaction logging) ---
-
+// --- Payment APIs ---
 app.post('/api/payment/create', async (req, res) => {
   try {
     const { key, credit } = req.body;
@@ -280,22 +191,18 @@ app.post('/api/payment/create', async (req, res) => {
 app.post('/api/payment/webhook', async (req, res) => {
     const webhookData = req.body;
     try {
-        // PayOS khuyến khích xác thực webhook, nhưng để đơn giản, ta tạm bỏ qua
         if (webhookData.code === '00' && webhookData.data.status === 'PAID') {
             const { orderCode, amount, description } = webhookData.data;
-            const key = description.split(' ').pop(); // Lấy key từ mô tả
+            const key = description.split(' ').pop();
             const credit = Math.floor(amount / 1000);
 
-            // Tránh xử lý trùng lặp
             const existingTransaction = await Transaction.findOne({ orderId: orderCode });
             if (existingTransaction) {
                 return res.status(200).json({ message: 'Transaction already processed.' });
             }
 
-            // Cập nhật credit cho key
-            await Key.updateOne({ key }, { $inc: { credit: credit } });
+            await require('./models/Key').updateOne({ key }, { $inc: { credit: credit } });
 
-            // Ghi nhận giao dịch
             const newTransaction = new Transaction({
                 orderId: orderCode,
                 amount,
@@ -305,7 +212,6 @@ app.post('/api/payment/webhook', async (req, res) => {
             });
             await newTransaction.save();
 
-            // Ghi log
             await createAuditLog('PAYMENT_SUCCESS', `${credit} credit added to key ${key} via PayOS. Order: ${orderCode}.`, 'PayOS');
         }
         res.status(200).json({ success: true });
@@ -314,7 +220,6 @@ app.post('/api/payment/webhook', async (req, res) => {
         res.status(500).json({ success: false });
     }
 });
-
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
