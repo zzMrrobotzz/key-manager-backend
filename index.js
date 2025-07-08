@@ -18,7 +18,8 @@ const app = express();
 const allowedOrigins = [
   'https://keyadmintoolviettruyen.netlify.app', // Deployed Admin Frontend
   'http://localhost:3000', // Local Admin Frontend for testing
-  'http://localhost:5173'  // Local Main App Frontend for testing
+  'http://localhost:5173',  // Local Main App Frontend for testing
+  'https://toolviettruyen.netlify.app' // Deployed Main App Frontend
 ];
 
 const corsOptions = {
