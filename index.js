@@ -13,31 +13,26 @@ const AuditLog = require('./models/AuditLog'); // <--- DÒNG BỊ THIẾU
 
 // --- App & Middleware Setup ---
 const app = express();
+app.use(express.json());
 
 // --- CORS Configuration ---
 const allowedOrigins = [
-  'https://keyadmintoolviettruyen.netlify.app', // Deployed Admin Frontend
-  'http://localhost:3000', // Local Admin Frontend for testing
-  'http://localhost:5173',  // Local Main App Frontend for testing
-  'https://toolviettruyen.netlify.app' // Deployed Main App Frontend
+  'https://keyadmintoolviettruyen.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173', // Add the preview port
+  'https://toolviettruyen.netlify.app'
 ];
 
-const corsOptions = {
+app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
-  },
-  optionsSuccessStatus: 200,
-  credentials: true // Optional: if you need to send cookies
-};
-
-app.use(cors(corsOptions));
-app.use(express.json());
+  }
+}));
 
 // --- MongoDB Connection & Initialization ---
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
