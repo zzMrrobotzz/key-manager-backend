@@ -13,10 +13,28 @@ const AuditLog = require('./models/AuditLog'); // <--- DÒNG BỊ THIẾU
 
 // --- App & Middleware Setup ---
 const app = express();
+
+// --- CORS Configuration ---
+const allowedOrigins = [
+  'https://keyadmintoolviettruyen.netlify.app', // Deployed Admin Frontend
+  'http://localhost:3000', // Local Admin Frontend for testing
+  'http://localhost:5173'  // Local Main App Frontend for testing
+];
+
 const corsOptions = {
-  origin: 'https://keyadmintoolviettruyen.netlify.app',
-  optionsSuccessStatus: 200
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  optionsSuccessStatus: 200,
+  credentials: true // Optional: if you need to send cookies
 };
+
 app.use(cors(corsOptions));
 app.use(express.json());
 
