@@ -1,1 +1,1 @@
-fix(backend): Restore missing dashboard and package routes
+fix(backend): Rebuild index.js from scratch to fix crash
