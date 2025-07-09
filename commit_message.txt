@@ -1,1 +1,1 @@
-fix(backend): Remove non-existent Package model to fix crash
+fix(backend): Restore missing dashboard and package routes
