@@ -67,8 +67,11 @@ const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 // --- API Routers ---
 const keyRoutes = require('./routes/keys');
 const packageRoutes = require('./routes/packages');
+const adminKeysRoutes = require('./routes/adminKeys');
 app.use('/api/keys', keyRoutes);
 app.use('/api/packages', packageRoutes);
+app.use('/api/admin/keys', adminKeysRoutes);
+app.use('/api/keys', adminKeysRoutes); // Cho phép webadmin cũ gọi /api/keys
 
 
 // --- General API Endpoints ---
