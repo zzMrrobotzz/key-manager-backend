@@ -21,6 +21,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173', // Add the preview port
+  'http://localhost:5176', // Add the new vite port
   'https://toolviettruyen.netlify.app'
 ];
 
@@ -35,7 +36,7 @@ app.use(cors({
 }));
 
 // --- MongoDB Connection & Initialization ---
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connected!');
     initializeApiProviders();

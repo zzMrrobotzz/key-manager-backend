@@ -2,10 +2,10 @@
   "name": "toolviettruyen-backend",
   "version": "1.0.0",
   "description": "Backend API cho tool viết truyện với quản lý AI key tập trung",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
