@@ -1,1 +1,1 @@
-fix(backend): Restore all API routes and fix 404 error
+refactor(backend): Consolidate all routes into single index.js to fix 404 errors
