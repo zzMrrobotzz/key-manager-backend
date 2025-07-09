@@ -1,1 +1,1 @@
-fix(backend): Rebuild index.js from scratch to fix crash
+fix(backend): Correct dashboard API response structure

@@ -92,10 +92,27 @@ app.get('/api/stats/dashboard', async (req, res) => {
       { $match: { status: 'Success' } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
+    const monthlyTransactions = await Transaction.countDocuments({ 
+        status: 'Success', 
+        timestamp: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } 
+    });
+    const apiUsage = await ApiProvider.aggregate([
+        { $group: { _id: null, totalRequests: { $sum: '$totalRequests' }, costToday: { $sum: '$costToday' } } }
+    ]);
+
     res.json({
-      totalKeys,
-      activeKeys,
-      totalRevenue: totalRevenue[0]?.total || 0,
+      billingStats: {
+        totalRevenue: totalRevenue[0]?.total || 0,
+        monthlyTransactions: monthlyTransactions,
+      },
+      apiUsageStats: {
+        totalRequests: apiUsage[0]?.totalRequests || 0,
+        costToday: apiUsage[0]?.costToday || 0,
+      },
+      keyStats: {
+        totalKeys,
+        activeKeys,
+      }
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch dashboard stats' });
