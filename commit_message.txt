@@ -1,1 +1,1 @@
-refactor(backend): Consolidate all routes into single index.js to fix 404 errors
+fix(backend): Remove non-existent Package model to fix crash
