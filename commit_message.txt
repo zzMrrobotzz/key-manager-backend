@@ -1,1 +1,1 @@
-feat(backend): Add API endpoints for key management
+fix(backend): Rebuild index.js from scratch to fix all errors
