@@ -72,7 +72,7 @@ const adminKeysRoutes = require('./routes/adminKeys');
 app.use('/api/keys', keyRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/admin/keys', adminKeysRoutes);
-app.use('/api/keys', adminKeysRoutes); // Cho phép webadmin cũ gọi /api/keys
+// app.use('/api/keys', adminKeysRoutes); // Dòng này gây xung đột và đã được vô hiệu hóa
 
 
 // --- General API Endpoints ---
