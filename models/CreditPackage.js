@@ -9,4 +9,4 @@ const creditPackageSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true }, // Để ẩn/hiện gói cước
 });
 
-module.exports = mongoose.model('CreditPackage', creditPackageSchema);
+module.exports = mongoose.model('CreditPackage', creditPackageSchema); 

@@ -9,4 +9,4 @@ const createAuditLog = async (action, details = '', actor = 'System') => {
   }
 };
 
-module.exports = { createAuditLog };
+module.exports = { createAuditLog }; 

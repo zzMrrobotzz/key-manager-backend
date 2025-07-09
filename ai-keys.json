@@ -1,0 +1,7 @@
+{
+  "gemini": "YOUR_GEMINI_API_KEY_HERE",
+  "openai": "YOUR_OPENAI_API_KEY_HERE", 
+  "deepseek": "YOUR_DEEPSEEK_API_KEY_HERE",
+  "stability": "YOUR_STABILITY_API_KEY_HERE",
+  "elevenlabs": "YOUR_ELEVENLABS_API_KEY_HERE"
+} 

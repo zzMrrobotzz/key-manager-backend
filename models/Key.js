@@ -10,4 +10,4 @@ const keySchema = new mongoose.Schema({
   credit: { type: Number, default: 0 },
 });
 
-module.exports = mongoose.model('Key', keySchema);
+module.exports = mongoose.model('Key', keySchema); 

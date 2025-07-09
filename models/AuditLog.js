@@ -7,4 +7,4 @@ const auditLogSchema = new mongoose.Schema({
   details: { type: String },
 });
 
-module.exports = mongoose.model('AuditLog', auditLogSchema);
+module.exports = mongoose.model('AuditLog', auditLogSchema); 

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const CreditPackage = require('../models/CreditPackage');
-const { createAuditLog } = require('../utils/auditLogger'); // Dùng hàm chung
+const { createAuditLog } = require('../utils/auditLogger');
 
 // GET /api/packages - Lấy tất cả gói cước
 router.get('/', async (req, res) => {
     try {
-        const packages = await CreditPackage.find().sort({ price: 1 }); // Sắp xếp theo gi��
+        const packages = await CreditPackage.find().sort({ price: 1 });
         res.json(packages);
     } catch (error) {
         res.status(500).json({ message: 'Lỗi máy chủ' });
@@ -59,4 +59,4 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-module.exports = router;
+module.exports = router; 
