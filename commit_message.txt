@@ -1,1 +1,1 @@
-feat(backend): Add AI proxy endpoint and dependencies
+fix(backend): Restore all API routes and fix 404 error
