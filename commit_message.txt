@@ -1,1 +1,1 @@
-fix(api): Remove conflicting route handler for /api/keys
+feat(backend): Add AI proxy endpoint and dependencies
