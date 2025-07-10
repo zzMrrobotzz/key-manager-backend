@@ -110,6 +110,26 @@ app.delete('/api/providers/:providerId/keys', async (req, res) => {
     }
 });
 
+// --- NEW: Create a new API Provider ---
+app.post('/api/providers', async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: 'Provider name is required' });
+        }
+        // Check if provider already exists
+        const existingProvider = await ApiProvider.findOne({ name });
+        if (existingProvider) {
+            return res.status(409).json({ message: `Provider '${name}' already exists.` });
+        }
+        const newProvider = new ApiProvider({ name });
+        await newProvider.save();
+        res.status(201).json(newProvider);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create API provider' });
+    }
+});
+
 // Package Management
 app.get('/api/packages', async (req, res) => {
     try {
@@ -125,14 +145,32 @@ app.get('/api/stats/dashboard', async (req, res) => {
   try {
     const totalKeys = await Key.countDocuments();
     const activeKeys = await Key.countDocuments({ isActive: true });
-    const totalRevenue = await Transaction.aggregate([
+    const expiredKeys = await Key.countDocuments({ expiredAt: { $lt: new Date() } });
+    
+    const billingResult = await Transaction.aggregate([
       { $match: { status: 'Success' } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
+    
+    // Lấy dữ liệu từ các providers
+    const providers = await ApiProvider.find();
+    const totalRequests = providers.reduce((sum, p) => sum + (p.totalRequests || 0), 0);
+    const costToday = providers.reduce((sum, p) => sum + (p.costToday || 0), 0);
+
     res.json({
-      totalKeys,
-      activeKeys,
-      totalRevenue: totalRevenue[0]?.total || 0,
+      keyStats: {
+        total: totalKeys,
+        active: activeKeys,
+        expired: expiredKeys,
+      },
+      billingStats: {
+        totalRevenue: billingResult[0]?.total || 0,
+        monthlyTransactions: 0, // Cần logic phức tạp hơn để tính, tạm thời để 0
+      },
+      apiUsageStats: {
+        totalRequests: totalRequests,
+        costToday: costToday,
+      }
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch dashboard stats' });
