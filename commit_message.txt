@@ -1,1 +1,1 @@
-fix(backend): Rebuild index.js from scratch to fix all errors
+feat(api): configure CORS and add status endpoint
