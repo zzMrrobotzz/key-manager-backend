@@ -16,7 +16,12 @@ const { createAuditLog } = require('./utils/auditLogger');
 const app = express();
 
 // --- CORS Configuration ---
-const allowedOrigins = ['https://keyadmintoolviettruyen.netlify.app', 'http://localhost:3000', 'http://localhost:5173'];
+const allowedOrigins = [
+  'https://keyadmintoolviettruyen.netlify.app',
+  'https://toolviettruyen.netlify.app', // Thêm domain frontend người dùng cuối
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
