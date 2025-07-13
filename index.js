@@ -12,6 +12,9 @@ const AuditLog = require('./models/AuditLog');
 const Package = require('./models/Package');
 const { createAuditLog } = require('./utils/auditLogger');
 
+// --- Import Routes ---
+const keysRouter = require('./routes/keys');
+
 // --- App & Middleware Setup ---
 const app = express();
 
@@ -48,44 +51,10 @@ app.get('/api/status', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Backend is awake and running.' });
 });
 
-// Key Management
-app.get('/api/keys', async (req, res) => {
-    try {
-        const keys = await Key.find().sort({ createdAt: -1 });
-        res.json(keys);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch keys' });
-    }
-});
-
-app.post('/api/keys', async (req, res) => {
-    try {
-        const newKey = new Key({
-            key: req.body.key,
-            credit: req.body.credit || 0,
-            note: req.body.note,
-            expiredAt: req.body.expiredAt,
-            maxActivations: req.body.maxActivations || 1,
-        });
-        await newKey.save();
-        res.status(201).json(newKey);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to create key' });
-    }
-});
-
-app.post('/api/keys/validate', async (req, res) => {
-    try {
-        const { key } = req.body;
-        const keyDoc = await Key.findOne({ key, isActive: true });
-        if (!keyDoc) {
-            return res.status(404).json({ message: 'Key not found or inactive' });
-        }
-        res.json({ success: true, keyInfo: keyDoc });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error during key validation' });
-    }
-});
+// --- Các route key cũ đã được chuyển sang router, nên có thể xóa hoặc comment các route sau ---
+// app.get('/api/keys', ...)
+// app.post('/api/keys', ...)
+// app.post('/api/keys/validate', ...)
 
 // Provider Management
 app.get('/api/providers', async (req, res) => {
@@ -247,6 +216,9 @@ app.post('/api/ai/generate', async (req, res) => {
         res.status(500).json({ success: false, error: `Failed to generate content with ${provider}.` });
     }
 });
+
+// Mount keys router
+app.use('/api/keys', keysRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
