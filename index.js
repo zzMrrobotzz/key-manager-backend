@@ -417,11 +417,9 @@ app.get('/api/audit-log', async (req, res) => {
             await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
         }
         
-        // Log the actual error on the server for debugging, but send a generic message to the client.
         const logger = console; // Replace with a real logger like Winston if you have one
         logger.error(`AI Generation Error for key ${userKey}: ${error.message}`);
 
-        // Determine status code based on the error
         if (error.message.includes('No API keys')) {
             return res.status(503).json({ success: false, error: error.message });
         }
