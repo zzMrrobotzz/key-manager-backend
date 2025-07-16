@@ -181,7 +181,7 @@ app.get('/api/audit-log', async (req, res) => {
     }
 });
 
-// AI Proxy Endpoint - SECURE AND LINT-FRIENDLY VERSION
+// AI Proxy Endpoint - CORRECTED VERSION
 app.post('/api/ai/generate', async (req, res) => {
     const { prompt, provider } = req.body;
     const userKey = req.headers.authorization?.split(' ')[1];
@@ -417,7 +417,7 @@ app.get('/api/audit-log', async (req, res) => {
             await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
         }
         
-        const logger = console; // Replace with a real logger like Winston if you have one
+        const logger = console;
         logger.error(`AI Generation Error for key ${userKey}: ${error.message}`);
 
         if (error.message.includes('No API keys')) {
