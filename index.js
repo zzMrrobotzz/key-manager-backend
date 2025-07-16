@@ -220,7 +220,7 @@ app.post('/api/ai/generate', async (req, res) => {
 
 // Mount keys router
 app.use('/api/keys', keysRouter);
-app.use('/api/keys', adminKeysRouter);
+app.use('/api/admin/keys', adminKeysRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
