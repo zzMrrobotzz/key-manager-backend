@@ -80,16 +80,26 @@ app.post('/api/providers/:providerId/keys', async (req, res) => {
     }
 });
 
-app.delete('/api/providers/:providerId/keys', async (req, res) => {
+app.delete('/api/providers/:providerId/keys/:apiKey', async (req, res) => {
     try {
-        const { providerId } = req.params;
-        const { apiKey } = req.body;
-        if (!apiKey) return res.status(400).json({ message: 'apiKey is required' });
-        
-        const provider = await ApiProvider.findById(providerId);
-        if (!provider) return res.status(404).json({ message: 'Provider not found' });
+        const { providerId, apiKey: apiKeyToDelete } = req.params;
 
-        provider.apiKeys = provider.apiKeys.filter(k => k !== apiKey);
+        // Since the API key can contain special characters, it's good practice to decode it.
+        const decodedApiKey = decodeURIComponent(apiKeyToDelete);
+
+        const provider = await ApiProvider.findById(providerId);
+        if (!provider) {
+            return res.status(404).json({ message: 'Provider not found' });
+        }
+
+        // Filter out the key to be deleted.
+        const initialKeyCount = provider.apiKeys.length;
+        provider.apiKeys = provider.apiKeys.filter(k => k !== decodedApiKey);
+
+        if (provider.apiKeys.length === initialKeyCount) {
+            return res.status(404).json({ message: 'API key not found in this provider' });
+        }
+
         await provider.save();
         res.json(provider);
     } catch (error) {
