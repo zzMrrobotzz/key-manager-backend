@@ -206,8 +206,9 @@ app.post('/api/ai/generate', async (req, res) => {
             const result = await model.generateContent(prompt);
             const generatedText = result.response.text();
             
-            dbKey.credit -= 1;
-            await dbKey.save();
+            // Không trừ credit ở đây nữa vì frontend đã trừ trước đó
+            // dbKey.credit -= 1;
+            // await dbKey.save();
             
             res.json({ success: true, text: generatedText, remainingCredits: dbKey.credit });
         } else {
