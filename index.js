@@ -181,7 +181,7 @@ app.get('/api/audit-log', async (req, res) => {
     }
 });
 
-// AI Proxy Endpoint - SECURE VERSION
+// AI Proxy Endpoint - SECURE AND LINT-FRIENDLY VERSION
 app.post('/api/ai/generate', async (req, res) => {
     const { prompt, provider } = req.body;
     const userKey = req.headers.authorization?.split(' ')[1];
@@ -190,22 +190,20 @@ app.post('/api/ai/generate', async (req, res) => {
         return res.status(401).json({ message: 'Authorization key is missing.' });
     }
 
-    // Step 1: Find the user's key and atomically decrement the credit.
-    // This is a single, atomic operation, which prevents race conditions.
-    const updatedKey = await Key.findOneAndUpdate(
-        { key: userKey, isActive: true, credit: { $gt: 0 } }, // Find active key with credits > 0
-        { $inc: { credit: -1 } }, // Atomically decrement credit by 1
-        { new: true } // Return the updated document
-    );
-
-    // Step 2: Check if the key was valid and had credits.
-    if (!updatedKey) {
-        // This will fail if key is not found, is inactive, or has 0 credits.
-        return res.status(403).json({ message: 'Invalid key, inactive key, or insufficient credits.' });
-    }
-
+    let updatedKey;
     try {
-        // Step 3: Find the AI provider. Using a case-insensitive index is more efficient.
+        // Step 1: Atomically find and decrement the user's key.
+        updatedKey = await Key.findOneAndUpdate(
+            { key: userKey, isActive: true, credit: { $gt: 0 } },
+            { $inc: { credit: -1 } },
+            { new: true }
+        );
+
+        if (!updatedKey) {
+            return res.status(403).json({ message: 'Invalid key, inactive key, or insufficient credits.' });
+        }
+
+        // Step 2: Find the AI provider.
         const providerDoc = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -391,41 +389,47 @@ app.get('/api/audit-log', async (req, res) => {
 
 , "i") } });
         if (!providerDoc || !providerDoc.apiKeys || providerDoc.apiKeys.length === 0) {
-            // IMPORTANT: If provider fails, we must refund the credit.
-            await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
-            return res.status(503).json({ message: `No API keys configured for provider: ${provider}.` });
+            throw new Error(`No API keys configured for provider: ${provider}.`);
         }
 
-        // Randomly select a key for load balancing
         const apiKey = providerDoc.apiKeys[Math.floor(Math.random() * providerDoc.apiKeys.length)];
         
-        // Step 4: Call the AI service (scalable approach).
+        // Step 3: Call the AI service.
         let generatedText;
         switch (provider.toLowerCase()) {
-            case 'gemini':
+            case 'gemini': {
                 const genAI = new GoogleGenerativeAI(apiKey);
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                 const result = await model.generateContent(prompt);
                 generatedText = result.response.text();
                 break;
-            // Add other providers here in the future
-            // case 'openai':
-            //   // ... call openai service
-            //   break;
+            }
             default:
-                // IMPORTANT: Refund credit if provider is not supported.
-                await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
-                return res.status(400).json({ message: `Provider '${provider}' is not yet supported.` });
+                throw new Error(`Provider '${provider}' is not yet supported.`);
         }
         
-        // Step 5: Return the successful response.
-        res.json({ success: true, text: generatedText, remainingCredits: updatedKey.credit });
+        // Step 4: Return the successful response.
+        return res.json({ success: true, text: generatedText, remainingCredits: updatedKey.credit });
 
     } catch (error) {
-        // IMPORTANT: If any error occurs during generation, refund the credit.
-        await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
-        console.error(`AI Generation Error for key ${userKey}:`, error);
-        res.status(500).json({ success: false, error: `Failed to generate content with ${provider}.` });
+        // Step 5: Universal error handling. If a credit was deducted, refund it.
+        if (updatedKey) {
+            await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
+        }
+        
+        // Log the actual error on the server for debugging, but send a generic message to the client.
+        const logger = console; // Replace with a real logger like Winston if you have one
+        logger.error(`AI Generation Error for key ${userKey}: ${error.message}`);
+
+        // Determine status code based on the error
+        if (error.message.includes('No API keys')) {
+            return res.status(503).json({ success: false, error: error.message });
+        }
+        if (error.message.includes('not yet supported')) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+        
+        return res.status(500).json({ success: false, error: 'An internal server error occurred.' });
     }
 });
 
