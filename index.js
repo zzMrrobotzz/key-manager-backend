@@ -14,6 +14,7 @@ const { createAuditLog } = require('./utils/auditLogger');
 
 // --- Import Routes ---
 const keysRouter = require('./routes/keys');
+const adminKeysRouter = require('./routes/adminKeys');
 
 // --- App & Middleware Setup ---
 const app = express();
@@ -219,6 +220,7 @@ app.post('/api/ai/generate', async (req, res) => {
 
 // Mount keys router
 app.use('/api/keys', keysRouter);
+app.use('/api/keys', adminKeysRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
