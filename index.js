@@ -18,6 +18,7 @@ const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
+const packagesRouter = require('./routes/packages');
 
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
@@ -131,15 +132,7 @@ app.post('/api/providers', async (req, res) => {
     }
 });
 
-// Package Management
-app.get('/api/packages', async (req, res) => {
-    try {
-        const packages = await Package.find().sort({ price: 1 });
-        res.json(packages);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch packages' });
-    }
-});
+// Package Management - moved to /routes/packages.js
 
 // Dashboard Stats
 app.get('/api/stats/dashboard', async (req, res) => {
@@ -278,6 +271,7 @@ app.use('/api/keys', keysRouter);
 app.use('/api/admin/keys', adminKeysRouter);
 app.use('/api/admin/proxies', adminProxiesRouter);
 app.use('/api/payment', paymentRouter);
+app.use('/api/packages', packagesRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
