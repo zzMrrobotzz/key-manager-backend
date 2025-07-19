@@ -1,13 +1,7 @@
 const Payment = require('../models/Payment');
 const Key = require('../models/Key');
+const CreditPackage = require('../models/CreditPackage');
 const { v4: uuidv4 } = require('uuid');
-
-// Pricing configuration - same as frontend
-const PRICING = [
-    { label: '100 bài viết', credit: 100, price: 500000 },
-    { label: '220 bài viết', credit: 220, price: 1000000 },
-    { label: '800 bài viết', credit: 800, price: 3000000 },
-];
 
 class PaymentService {
     constructor() {
@@ -20,18 +14,35 @@ class PaymentService {
     }
 
     /**
-     * Get price for credit amount
+     * Get price for credit amount from database
      */
-    getPriceForCredit(creditAmount) {
-        const pricePackage = PRICING.find(pkg => pkg.credit === creditAmount);
-        return pricePackage ? pricePackage.price : null;
+    async getPriceForCredit(creditAmount) {
+        try {
+            const creditPackage = await CreditPackage.findOne({ 
+                credits: creditAmount, 
+                isActive: { $ne: false } 
+            });
+            return creditPackage ? creditPackage.price : null;
+        } catch (error) {
+            console.error('Error getting price for credit:', error);
+            return null;
+        }
     }
 
     /**
-     * Validate credit amount
+     * Validate credit amount from database
      */
-    isValidCreditAmount(creditAmount) {
-        return PRICING.some(pkg => pkg.credit === creditAmount);
+    async isValidCreditAmount(creditAmount) {
+        try {
+            const creditPackage = await CreditPackage.findOne({ 
+                credits: creditAmount, 
+                isActive: { $ne: false } 
+            });
+            return !!creditPackage;
+        } catch (error) {
+            console.error('Error validating credit amount:', error);
+            return false;
+        }
     }
 
     /**
@@ -80,7 +91,7 @@ class PaymentService {
                 throw new Error('User key and credit amount are required');
             }
 
-            if (!this.isValidCreditAmount(creditAmount)) {
+            if (!(await this.isValidCreditAmount(creditAmount))) {
                 throw new Error('Invalid credit amount');
             }
 
@@ -90,7 +101,10 @@ class PaymentService {
                 throw new Error('Invalid or inactive user key');
             }
 
-            const price = this.getPriceForCredit(creditAmount);
+            const price = await this.getPriceForCredit(creditAmount);
+            if (!price) {
+                throw new Error('Unable to get price for credit amount');
+            }
 
             // Check for existing active payment
             const existingPayment = await Payment.findActivePayment(userKey, creditAmount);
@@ -258,7 +272,6 @@ class PaymentService {
 
 const paymentServiceInstance = new PaymentService();
 
-// Export both the instance and constants
+// Export both the instance and class
 module.exports = paymentServiceInstance;
-module.exports.PRICING = PRICING;
 module.exports.PaymentService = PaymentService;
