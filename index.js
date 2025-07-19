@@ -15,6 +15,10 @@ const { createAuditLog } = require('./utils/auditLogger');
 // --- Import Routes ---
 const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
+const adminProxiesRouter = require('./routes/adminProxies');
+
+// --- Import Services ---
+const proxyManager = require('./services/proxyManager');
 
 // --- App & Middleware Setup ---
 const app = express();
@@ -151,10 +155,14 @@ app.get('/api/stats/dashboard', async (req, res) => {
     const totalRequests = providers.reduce((sum, p) => sum + (p.totalRequests || 0), 0);
     const costToday = providers.reduce((sum, p) => sum + (p.costToday || 0), 0);
 
+    // Thêm proxy stats
+    const proxyStats = await proxyManager.getProxyStatistics();
+
     res.json({
-      keyStats: { total, active: activeKeys, expired: expiredKeys },
+      keyStats: { total: totalKeys, active: activeKeys, expired: expiredKeys },
       billingStats: { totalRevenue: billingResult[0]?.total || 0, monthlyTransactions: 0 },
-      apiUsageStats: { totalRequests, costToday }
+      apiUsageStats: { totalRequests, costToday },
+      proxyStats: proxyStats || { overview: {}, topPerformers: [] }
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch dashboard stats' });
@@ -202,10 +210,41 @@ app.post('/api/ai/generate', async (req, res) => {
         let generatedText;
         switch (provider.toLowerCase()) {
             case 'gemini': {
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                const result = await model.generateContent(prompt);
-                generatedText = result.response.text();
+                // Sử dụng proxy nếu có
+                const proxyForKey = await proxyManager.getProxyForApiKey(apiKey);
+                
+                if (proxyForKey) {
+                    // Gọi Gemini API qua proxy
+                    const agent = proxyManager.createProxyAgent(proxyForKey);
+                    const response = await proxyManager.makeRequestWithProxy(
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-goog-api-key': apiKey
+                            },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }]
+                            })
+                        },
+                        apiKey
+                    );
+                    
+                    if (!response.ok) {
+                        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    generatedText = data.candidates[0]?.content?.parts[0]?.text || 'No content generated';
+                } else {
+                    // Fallback to direct connection nếu không có proxy
+                    console.log(`📡 No proxy assigned for API key, using direct connection`);
+                    const genAI = new GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const result = await model.generateContent(prompt);
+                    generatedText = result.response.text();
+                }
                 break;
             }
             default:
@@ -232,9 +271,10 @@ app.post('/api/ai/generate', async (req, res) => {
     }
 });
 
-// Mount keys router
+// Mount routers
 app.use('/api/keys', keysRouter);
 app.use('/api/admin/keys', adminKeysRouter);
+app.use('/api/admin/proxies', adminProxiesRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
