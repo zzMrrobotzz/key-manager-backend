@@ -23,8 +23,8 @@ class PaymentService {
      * Get price for credit amount
      */
     getPriceForCredit(creditAmount) {
-        const package = PRICING.find(pkg => pkg.credit === creditAmount);
-        return package ? package.price : null;
+        const pricePackage = PRICING.find(pkg => pkg.credit === creditAmount);
+        return pricePackage ? pricePackage.price : null;
     }
 
     /**
