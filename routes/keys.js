@@ -29,7 +29,7 @@ router.post('/validate', async (req, res) => {
       return res.json({ success: false, message: 'Key đã hết credit!' });
     }
 
-    res.json({ success: true, message: 'Key hợp lệ', keyInfo: { credit: foundKey.credit, expiredAt: foundKey.expiredAt } });
+    res.json({ success: true, message: 'Key hợp lệ', keyInfo: { key: foundKey.key, credit: foundKey.credit, expiredAt: foundKey.expiredAt } });
   } catch (error) {
     console.error('Lỗi khi xác thực key:', error);
     res.status(500).json({ success: false, message: 'Lỗi server khi xác thực key.' });
