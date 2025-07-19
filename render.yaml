@@ -2,7 +2,7 @@ services:
   - type: web
     name: toolviettruyen-backend
     env: node
-    buildCommand: npm install
+    buildCommand: npm ci --only=production
     startCommand: npm start
     envVars:
       - key: NODE_ENV
