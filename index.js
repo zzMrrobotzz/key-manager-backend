@@ -16,6 +16,7 @@ const { createAuditLog } = require('./utils/auditLogger');
 const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
 const adminProxiesRouter = require('./routes/adminProxies');
+const paymentRouter = require('./routes/payment');
 
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
@@ -275,6 +276,7 @@ app.post('/api/ai/generate', async (req, res) => {
 app.use('/api/keys', keysRouter);
 app.use('/api/admin/keys', adminKeysRouter);
 app.use('/api/admin/proxies', adminProxiesRouter);
+app.use('/api/payment', paymentRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
