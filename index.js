@@ -10,6 +10,7 @@ const Key = require('./models/Key');
 const Transaction = require('./models/Transaction');
 const AuditLog = require('./models/AuditLog');
 const Package = require('./models/Package');
+const Payment = require('./models/Payment');
 const { createAuditLog } = require('./utils/auditLogger');
 
 // --- Import Routes ---

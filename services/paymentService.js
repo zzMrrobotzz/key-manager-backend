@@ -256,4 +256,9 @@ class PaymentService {
     }
 }
 
-module.exports = new PaymentService();
+const paymentServiceInstance = new PaymentService();
+
+// Export both the instance and constants
+module.exports = paymentServiceInstance;
+module.exports.PRICING = PRICING;
+module.exports.PaymentService = PaymentService;
