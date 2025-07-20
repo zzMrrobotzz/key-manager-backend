@@ -28,9 +28,11 @@ router.post('/complete-payment', async (req, res) => {
         const payment = await Payment.findOne({ 
             $or: [
                 { 'paymentData.orderCode': parseInt(orderCode) },
-                { 'paymentData.orderCode': orderCode }
+                { 'paymentData.orderCode': orderCode },
+                { '_id': orderCode }, // Also allow payment ID
+                { 'userKey': userKey, 'status': 'pending' } // Find any pending payment for user
             ]
-        });
+        }).sort({ createdAt: -1 }); // Get latest payment
 
         if (!payment) {
             return res.status(404).json({

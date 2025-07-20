@@ -36,7 +36,9 @@ const paymentSchema = new mongoose.Schema({
         qrCode: String,
         bankAccount: String,
         amount: Number,
-        transferContent: String
+        transferContent: String,
+        orderCode: Number,
+        payosPaymentLinkId: String
     },
     metadata: {
         ip: String,
