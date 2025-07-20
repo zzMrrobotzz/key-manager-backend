@@ -41,13 +41,22 @@ class PaymentService {
             console.warn('❌ PayOS SDK not available');
         }
 
-        // Default bank info (will be overridden by database)
+        // Default bank info (ONLY used if database is empty)
         this.defaultBankInfo = {
-            accountNumber: process.env.BANK_ACCOUNT_NUMBER || '0123456789',
-            accountName: process.env.BANK_ACCOUNT_NAME || 'NGUYEN VAN A',
-            bankName: process.env.BANK_NAME || 'Vietcombank',
-            branchName: process.env.BANK_BRANCH || 'CN Ho Chi Minh'
+            accountNumber: '0123456789',
+            accountName: 'NGUYEN VAN A', 
+            bankName: 'Vietcombank',
+            branchName: 'CN Ho Chi Minh'
         };
+        
+        console.log('🔧 Environment bank variables:', {
+            hasAccountNumber: !!process.env.BANK_ACCOUNT_NUMBER,
+            hasAccountName: !!process.env.BANK_ACCOUNT_NAME,
+            hasBankName: !!process.env.BANK_NAME,
+            accountNumber: process.env.BANK_ACCOUNT_NUMBER || 'not set',
+            accountName: process.env.BANK_ACCOUNT_NAME || 'not set',
+            bankName: process.env.BANK_NAME || 'not set'
+        });
     }
 
     /**
@@ -76,9 +85,21 @@ class PaymentService {
     async getBankInfo() {
         try {
             const bankInfo = await BankInfo.getActiveBankInfo();
-            return bankInfo || this.defaultBankInfo;
+            console.log('🏦 Bank info from database:', bankInfo ? {
+                bankName: bankInfo.bankName,
+                accountNumber: bankInfo.accountNumber,
+                accountName: bankInfo.accountName
+            } : 'No bank info found');
+            
+            if (!bankInfo) {
+                console.log('📝 Using default bank info:', this.defaultBankInfo);
+                return this.defaultBankInfo;
+            }
+            
+            return bankInfo;
         } catch (error) {
-            console.error('Error getting bank info:', error);
+            console.error('❌ Error getting bank info:', error);
+            console.log('📝 Fallback to default bank info:', this.defaultBankInfo);
             return this.defaultBankInfo;
         }
     }
