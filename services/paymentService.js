@@ -1,6 +1,7 @@
 const Payment = require('../models/Payment');
 const Key = require('../models/Key');
 const CreditPackage = require('../models/CreditPackage');
+const BankInfo = require('../models/BankInfo');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const axios = require('axios');
@@ -32,13 +33,26 @@ class PaymentService {
             );
         }
 
-        // Fallback bank info for manual transfer
-        this.bankInfo = {
+        // Default bank info (will be overridden by database)
+        this.defaultBankInfo = {
             accountNumber: process.env.BANK_ACCOUNT_NUMBER || '0123456789',
             accountName: process.env.BANK_ACCOUNT_NAME || 'NGUYEN VAN A',
             bankName: process.env.BANK_NAME || 'Vietcombank',
             branchName: process.env.BANK_BRANCH || 'CN Ho Chi Minh'
         };
+    }
+
+    /**
+     * Get active bank info from database
+     */
+    async getBankInfo() {
+        try {
+            const bankInfo = await BankInfo.getActiveBankInfo();
+            return bankInfo || this.defaultBankInfo;
+        } catch (error) {
+            console.error('Error getting bank info:', error);
+            return this.defaultBankInfo;
+        }
     }
 
     /**
@@ -205,6 +219,9 @@ class PaymentService {
                 throw new Error('Unable to get price for credit amount');
             }
 
+            // Get bank info from database
+            const bankInfo = await this.getBankInfo();
+
             // Check for existing active payment with PayOS data
             const existingPayment = await Payment.findActivePayment(userKey, creditAmount);
             if (existingPayment && existingPayment.paymentData.payosPaymentLinkId) {
@@ -215,9 +232,9 @@ class PaymentService {
                     payUrl: existingPayment.paymentData.payUrl,
                     qrData: existingPayment.paymentData.qrCode,
                     transferInfo: {
-                        accountNumber: this.bankInfo.accountNumber,
-                        accountName: this.bankInfo.accountName,
-                        bankName: this.bankInfo.bankName,
+                        accountNumber: bankInfo.accountNumber,
+                        accountName: bankInfo.accountName,
+                        bankName: bankInfo.bankName,
                         amount: existingPayment.price,
                         content: existingPayment.paymentData.transferContent
                     }
@@ -279,9 +296,9 @@ class PaymentService {
                 payUrl: paymentData.payUrl,
                 qrData: paymentData.qrCode,
                 transferInfo: {
-                    accountNumber: this.bankInfo.accountNumber,
-                    accountName: this.bankInfo.accountName,
-                    bankName: this.bankInfo.bankName,
+                    accountNumber: bankInfo.accountNumber,
+                    accountName: bankInfo.accountName,
+                    bankName: bankInfo.bankName,
                     amount: price,
                     content: transferContent
                 }
