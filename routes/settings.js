@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
             enableNewFeature: { value: true, type: 'boolean', description: 'Enable new features' },
             systemName: { value: 'AI Story Creator', type: 'string', description: 'System name' },
             adminEmail: { value: 'admin@example.com', type: 'string', description: 'Admin contact email' },
-            aiMaxOutputTokens: { value: 8192, type: 'number', description: 'Maximum output tokens for AI generation' },
+            aiMaxOutputTokens: { value: 16384, type: 'number', description: 'Maximum output tokens for AI generation' },
             aiTemperature: { value: 0.7, type: 'number', description: 'AI generation temperature (0.0-1.0)' },
             aiTopP: { value: 0.8, type: 'number', description: 'AI generation top P value (0.0-1.0)' },
             aiTopK: { value: 40, type: 'number', description: 'AI generation top K value' }
