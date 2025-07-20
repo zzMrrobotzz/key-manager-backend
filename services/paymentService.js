@@ -89,7 +89,13 @@ class PaymentService {
      */
     generatePayOSSignature(data) {
         const sortedKeys = Object.keys(data).sort();
-        const dataString = sortedKeys.map(key => `${key}=${data[key]}`).join('&');
+        const dataString = sortedKeys.map(key => {
+            const value = data[key];
+            if (typeof value === 'object') {
+                return `${key}=${JSON.stringify(value)}`;
+            }
+            return `${key}=${value}`;
+        }).join('&');
         return crypto.createHmac('sha256', this.payos.checksumKey).update(dataString).digest('hex');
     }
 
@@ -102,8 +108,15 @@ class PaymentService {
                 orderCode: parseInt(orderCode),
                 amount: parseInt(amount),
                 description: description,
-                returnUrl: returnUrl || 'https://your-website.com/return',
-                cancelUrl: cancelUrl || 'https://your-website.com/cancel'
+                items: [
+                    {
+                        name: "Nạp credit",
+                        quantity: 1,
+                        price: parseInt(amount)
+                    }
+                ],
+                returnUrl: returnUrl || 'https://toolviettruyen.netlify.app/return',
+                cancelUrl: cancelUrl || 'https://toolviettruyen.netlify.app/cancel'
             };
 
             // Create signature
