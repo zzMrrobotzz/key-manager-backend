@@ -2,9 +2,20 @@ const Payment = require('../models/Payment');
 const Key = require('../models/Key');
 const CreditPackage = require('../models/CreditPackage');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const axios = require('axios');
 
 class PaymentService {
     constructor() {
+        // PayOS Configuration
+        this.payos = {
+            clientId: process.env.PAYOS_CLIENT_ID || 'be64263c-d0b5-48c7-a5e4-9e1357786d4c',
+            apiKey: process.env.PAYOS_API_KEY || '6c790eab-3334-4180-bf54-d3071ca7f277',
+            checksumKey: process.env.PAYOS_CHECKSUM_KEY || '271d878407a1020d240d9064d0bfb4300bfe2e02bf997bb28771dea73912bd55',
+            baseUrl: 'https://api-merchant.payos.vn'
+        };
+
+        // Fallback bank info for manual transfer
         this.bankInfo = {
             accountNumber: process.env.BANK_ACCOUNT_NUMBER || '0123456789',
             accountName: process.env.BANK_ACCOUNT_NAME || 'NGUYEN VAN A',
@@ -14,31 +25,49 @@ class PaymentService {
     }
 
     /**
-     * Get price for credit amount from database
+     * Get price for credit amount from database (with fallback calculation)
      */
     async getPriceForCredit(creditAmount) {
         try {
+            // First check if exact package exists
             const creditPackage = await CreditPackage.findOne({ 
                 credits: creditAmount, 
                 isActive: { $ne: false } 
             });
-            return creditPackage ? creditPackage.price : null;
+            
+            if (creditPackage) {
+                return creditPackage.price;
+            }
+            
+            // ✅ FIXED: Fallback price calculation for flexible amounts
+            // Use rate: 1 credit = 4545 VNĐ (approximately)
+            const fallbackRate = 4545;
+            return creditAmount * fallbackRate;
         } catch (error) {
             console.error('Error getting price for credit:', error);
-            return null;
+            // Emergency fallback
+            return creditAmount * 4545;
         }
     }
 
     /**
-     * Validate credit amount from database
+     * Validate credit amount from database (with fallback for flexible amounts)
      */
     async isValidCreditAmount(creditAmount) {
         try {
+            // First check if exact package exists
             const creditPackage = await CreditPackage.findOne({ 
                 credits: creditAmount, 
                 isActive: { $ne: false } 
             });
-            return !!creditPackage;
+            
+            if (creditPackage) {
+                return true;
+            }
+            
+            // ✅ FIXED: Allow any positive credit amount as fallback
+            // This enables frontend default packages (100, 220, 800 credits)
+            return creditAmount > 0 && creditAmount <= 10000; // Max 10k credits
         } catch (error) {
             console.error('Error validating credit amount:', error);
             return false;
@@ -56,11 +85,61 @@ class PaymentService {
     }
 
     /**
-     * Generate payment URL (for demo purposes - replace with real payment gateway)
+     * Generate PayOS signature
+     */
+    generatePayOSSignature(data) {
+        const sortedKeys = Object.keys(data).sort();
+        const dataString = sortedKeys.map(key => `${key}=${data[key]}`).join('&');
+        return crypto.createHmac('sha256', this.payos.checksumKey).update(dataString).digest('hex');
+    }
+
+    /**
+     * Create PayOS payment link
+     */
+    async createPayOSPayment(orderCode, amount, description, returnUrl = '', cancelUrl = '') {
+        try {
+            const paymentData = {
+                orderCode: parseInt(orderCode),
+                amount: parseInt(amount),
+                description: description,
+                returnUrl: returnUrl || 'https://your-website.com/return',
+                cancelUrl: cancelUrl || 'https://your-website.com/cancel'
+            };
+
+            // Create signature
+            const signature = this.generatePayOSSignature(paymentData);
+
+            const response = await axios.post(`${this.payos.baseUrl}/v2/payment-requests`, paymentData, {
+                headers: {
+                    'x-client-id': this.payos.clientId,
+                    'x-api-key': this.payos.apiKey,
+                    'x-signature': signature,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.data.code === '00') {
+                return {
+                    success: true,
+                    paymentLinkId: response.data.data.paymentLinkId,
+                    checkoutUrl: response.data.data.checkoutUrl,
+                    qrCode: response.data.data.qrCode
+                };
+            } else {
+                throw new Error(`PayOS API Error: ${response.data.desc || 'Unknown error'}`);
+            }
+
+        } catch (error) {
+            console.error('PayOS payment creation error:', error.response?.data || error.message);
+            throw new Error(`Failed to create PayOS payment: ${error.response?.data?.desc || error.message}`);
+        }
+    }
+
+    /**
+     * Generate payment URL (fallback to manual transfer if PayOS fails)
      */
     generatePaymentUrl(paymentData) {
-        // For demo, we'll create a simple URL that shows payment info
-        // In production, integrate with real payment gateways like VNPay, MoMo, ZaloPay
+        // Fallback manual transfer URL
         const params = new URLSearchParams({
             amount: paymentData.amount,
             content: paymentData.transferContent,
@@ -68,17 +147,15 @@ class PaymentService {
             bank: this.bankInfo.bankName
         });
         
-        // This should be replaced with actual payment gateway URL
-        return `https://demo-payment-gateway.com/pay?${params.toString()}`;
+        return `https://your-manual-payment-page.com/pay?${params.toString()}`;
     }
 
     /**
-     * Generate QR code data
+     * Generate QR code data (fallback for manual transfer)
      */
     generateQRData(paymentData) {
-        // Vietnam QR Pay format
-        // This is a simplified version - in production use proper QR banking format
-        return `BANK:${this.bankInfo.bankName}|ACC:${this.bankInfo.accountNumber}|AMOUNT:${paymentData.amount}|MSG:${paymentData.transferContent}`;
+        // Vietnam QR Pay format for manual transfer
+        return `2|010|${this.bankInfo.accountNumber}|${this.bankInfo.accountName}|${this.bankInfo.bankName}|${paymentData.amount}|${paymentData.transferContent}|VN`;
     }
 
     /**
@@ -120,19 +197,39 @@ class PaymentService {
 
             // Create new payment
             const paymentId = uuidv4();
+            const orderCode = Date.now(); // Unique order code for PayOS
             const transferContent = this.generateTransferContent(userKey, paymentId);
+            const description = `Nạp ${creditAmount} credit - ${transferContent}`;
             
             const paymentData = {
                 amount: price,
                 transferContent,
                 bankAccount: this.bankInfo.accountNumber,
                 payUrl: '',
-                qrCode: ''
+                qrCode: '',
+                orderCode: orderCode,
+                payosPaymentLinkId: null
             };
 
-            // Generate payment URL and QR data
-            paymentData.payUrl = this.generatePaymentUrl(paymentData);
-            paymentData.qrCode = this.generateQRData(paymentData);
+            try {
+                // Try to create PayOS payment first
+                console.log('Creating PayOS payment...', { orderCode, amount: price, description });
+                const payosResult = await this.createPayOSPayment(orderCode, price, description);
+                
+                if (payosResult.success) {
+                    paymentData.payUrl = payosResult.checkoutUrl;
+                    paymentData.qrCode = payosResult.qrCode;
+                    paymentData.payosPaymentLinkId = payosResult.paymentLinkId;
+                    console.log('PayOS payment created successfully:', payosResult.paymentLinkId);
+                } else {
+                    throw new Error('PayOS payment creation failed');
+                }
+            } catch (payosError) {
+                console.warn('PayOS payment creation failed, falling back to manual transfer:', payosError.message);
+                // Fallback to manual transfer
+                paymentData.payUrl = this.generatePaymentUrl(paymentData);
+                paymentData.qrCode = this.generateQRData(paymentData);
+            }
 
             const payment = new Payment({
                 userKey,
@@ -164,6 +261,41 @@ class PaymentService {
         } catch (error) {
             console.error('Payment creation error:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Check PayOS payment status
+     */
+    async checkPayOSPaymentStatus(orderCode) {
+        try {
+            const response = await axios.get(`${this.payos.baseUrl}/v2/payment-requests/${orderCode}`, {
+                headers: {
+                    'x-client-id': this.payos.clientId,
+                    'x-api-key': this.payos.apiKey,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.data.code === '00') {
+                return {
+                    success: true,
+                    status: response.data.data.status, // PENDING, PAID, CANCELLED
+                    data: response.data.data
+                };
+            } else {
+                return {
+                    success: false,
+                    error: response.data.desc || 'Unknown error'
+                };
+            }
+
+        } catch (error) {
+            console.error('PayOS status check error:', error.response?.data || error.message);
+            return {
+                success: false,
+                error: error.response?.data?.desc || error.message
+            };
         }
     }
 

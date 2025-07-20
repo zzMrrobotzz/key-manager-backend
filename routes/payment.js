@@ -6,14 +6,41 @@ const { createAuditLog } = require('../utils/auditLogger');
 // POST /api/payment/create - Tạo payment mới
 router.post('/create', async (req, res) => {
     try {
-        const { key, credit } = req.body;
+        // ✅ FIXED: Accept multiple field formats from frontend
+        const { 
+            key, 
+            credit, 
+            creditAmount, 
+            credits, 
+            amount,
+            packageId,
+            price
+        } = req.body;
 
-        if (!key || !credit) {
+        console.log('Payment request received:', req.body);
+
+        // ✅ FIXED: Validate key
+        if (!key || typeof key !== 'string' || key.trim() === '') {
             return res.status(400).json({
                 success: false,
-                error: 'Key and credit amount are required'
+                error: 'Valid key is required'
             });
         }
+
+        // ✅ FIXED: Extract credit amount from any field
+        const finalCreditAmount = creditAmount || credit || credits || amount;
+        
+        if (!finalCreditAmount || finalCreditAmount <= 0 || isNaN(finalCreditAmount)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Valid credit amount is required'
+            });
+        }
+
+        console.log('Processed payment request:', { 
+            key: key.substring(0, 10) + '...', 
+            creditAmount: finalCreditAmount 
+        });
 
         // Extract metadata from request
         const metadata = {
@@ -22,9 +49,9 @@ router.post('/create', async (req, res) => {
             referer: req.headers.referer
         };
 
-        const result = await paymentService.createPayment(key, credit, metadata);
+        const result = await paymentService.createPayment(key, finalCreditAmount, metadata);
 
-        await createAuditLog('PAYMENT_CREATED', `Payment created for key ${key.substring(0, 10)}... Amount: ${credit} credits`);
+        await createAuditLog('PAYMENT_CREATED', `Payment created for key ${key.substring(0, 10)}... Amount: ${finalCreditAmount} credits`);
 
         return res.json({
             success: true,
@@ -169,18 +196,142 @@ router.get('/user/:userKey', async (req, res) => {
     }
 });
 
-// GET /api/payment/packages - Lấy danh sách gói credit
-router.get('/packages', (req, res) => {
-    const packages = [
-        { label: '100 bài viết', credit: 100, price: 500000 },
-        { label: '220 bài viết', credit: 220, price: 1000000 },
-        { label: '800 bài viết', credit: 800, price: 3000000 },
-    ];
+// POST /api/payment/check-payos/:orderCode - Kiểm tra trạng thái thanh toán PayOS
+router.post('/check-payos/:orderCode', async (req, res) => {
+    try {
+        const { orderCode } = req.params;
 
-    return res.json({
-        success: true,
-        packages
-    });
+        if (!orderCode) {
+            return res.status(400).json({
+                success: false,
+                error: 'Order code is required'
+            });
+        }
+
+        const result = await paymentService.checkPayOSPaymentStatus(orderCode);
+
+        if (result.success && result.status === 'PAID') {
+            // Tự động hoàn thành payment nếu đã thanh toán
+            const payment = await Payment.findOne({ 'paymentData.orderCode': parseInt(orderCode) });
+            if (payment && payment.status === 'pending') {
+                await paymentService.completePayment(payment._id, result.data.transactions?.[0]?.reference || `PAYOS_${orderCode}`);
+                await createAuditLog('PAYMENT_AUTO_COMPLETED', `PayOS payment ${orderCode} auto completed`);
+            }
+        }
+
+        return res.json({
+            success: true,
+            payosStatus: result.status,
+            payosData: result.data || null,
+            error: result.error || null
+        });
+
+    } catch (error) {
+        console.error('Check PayOS payment error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+});
+
+// POST /api/payment/webhook/payos - Webhook cho PayOS
+router.post('/webhook/payos', async (req, res) => {
+    try {
+        const webhookData = req.body;
+        
+        console.log('PayOS webhook received:', webhookData);
+
+        // Verify webhook signature if needed
+        // const signature = req.headers['x-signature'];
+        
+        if (webhookData.code === '00' && webhookData.data.status === 'PAID') {
+            const orderCode = webhookData.data.orderCode;
+            
+            // Tìm payment tương ứng
+            const payment = await Payment.findOne({ 'paymentData.orderCode': orderCode });
+            
+            if (payment && payment.status === 'pending') {
+                // Tự động hoàn thành payment
+                await paymentService.completePayment(
+                    payment._id, 
+                    webhookData.data.transactions?.[0]?.reference || `PAYOS_WEBHOOK_${orderCode}`
+                );
+                
+                await createAuditLog('PAYMENT_WEBHOOK_COMPLETED', `PayOS webhook completed payment ${payment._id}`);
+                
+                console.log(`✅ PayOS webhook: Payment ${payment._id} completed automatically`);
+            }
+        }
+
+        return res.json({ success: true });
+
+    } catch (error) {
+        console.error('PayOS webhook error:', error);
+        return res.status(500).json({ success: false, error: 'Webhook processing failed' });
+    }
+});
+
+// GET /api/payment/packages - Lấy danh sách gói credit
+router.get('/packages', async (req, res) => {
+    try {
+        const CreditPackage = require('../models/CreditPackage');
+        
+        // Lấy tất cả gói credit đang active
+        const packages = await CreditPackage.find({ isActive: { $ne: false } }).sort({ price: 1 });
+
+        return res.json({
+            success: true,
+            packages: packages.map(pkg => ({
+                _id: pkg._id,
+                name: pkg.name,
+                price: pkg.price,
+                credits: pkg.credits,
+                bonus: pkg.bonus,
+                isPopular: pkg.isPopular,
+                isActive: pkg.isActive
+            }))
+        });
+
+    } catch (error) {
+        console.error('Get packages error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: 'Unable to fetch credit packages'
+        });
+    }
+});
+
+// POST /api/payment/init-packages - Khởi tạo gói credit mặc định (admin only)
+router.post('/init-packages', async (req, res) => {
+    try {
+        const { initCreditPackages } = require('../scripts/initCreditPackages');
+        
+        const packages = await initCreditPackages();
+
+        await createAuditLog('CREDIT_PACKAGES_INIT', `Initialized ${packages.length} credit packages`);
+
+        return res.json({
+            success: true,
+            message: `Initialized ${packages.length} credit packages successfully`,
+            packages: packages.map(pkg => ({
+                name: pkg.name,
+                price: pkg.price,
+                credits: pkg.credits,
+                bonus: pkg.bonus
+            }))
+        });
+
+    } catch (error) {
+        console.error('Init packages error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to initialize credit packages'
+        });
+    }
 });
 
 // POST /api/payment/cleanup - Cleanup expired payments (admin only)
