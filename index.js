@@ -38,16 +38,21 @@ const allowedOrigins = [
 ];
 const corsOptions = {
   origin: (origin, callback) => {
+    console.log(`🔒 CORS check for origin: ${origin}`);
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      console.error(`❌ CORS blocked: ${origin}`);
       return callback(new Error(msg), false);
     }
     return callback(null, true);
-  }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- MongoDB Connection ---
 mongoose.connect(process.env.MONGODB_URI)
@@ -220,13 +225,20 @@ app.get('/api/audit-log', async (req, res) => {
     }
 });
 
-// AI Proxy Endpoint - CORRECTED AND FINAL VERSION
+// AI Proxy Endpoint - ENHANCED WITH BETTER ERROR HANDLING
 app.post('/api/ai/generate', async (req, res) => {
+    const startTime = Date.now();
     const { prompt, provider } = req.body;
     const userKey = req.headers.authorization?.split(' ')[1];
+    
+    console.log(`🚀 AI Generate request: Provider=${provider}, Prompt length=${prompt?.length || 0}, User key=${userKey?.slice(0, 8)}...`);
 
     if (!userKey) {
         return res.status(401).json({ message: 'Authorization key is missing.' });
+    }
+
+    if (!prompt || prompt.length === 0) {
+        return res.status(400).json({ message: 'Prompt is required and cannot be empty.' });
     }
 
     let updatedKey;
@@ -252,6 +264,8 @@ app.post('/api/ai/generate', async (req, res) => {
         const temperature = await Settings.getSetting('aiTemperature', 0.7);
         const topP = await Settings.getSetting('aiTopP', 0.8);
         const topK = await Settings.getSetting('aiTopK', 40);
+        
+        console.log(`⚙️ AI Settings: maxTokens=${maxOutputTokens}, temp=${temperature}, topP=${topP}, topK=${topK}`);
 
         const apiKey = providerDoc.apiKeys[Math.floor(Math.random() * providerDoc.apiKeys.length)];
         
@@ -313,30 +327,51 @@ app.post('/api/ai/generate', async (req, res) => {
                 throw new Error(`Provider '${provider}' is not yet supported.`);
         }
         
+        const processingTime = Date.now() - startTime;
+        console.log(`✅ AI Generation success: ${generatedText?.length || 0} chars in ${processingTime}ms`);
+        
         return res.json({ success: true, text: generatedText, remainingCredits: updatedKey.credit });
 
     } catch (error) {
+        const processingTime = Date.now() - startTime;
+        
         if (updatedKey) {
             await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
         }
         
-        console.error(`🚨 AI Generation Error for key ${userKey}:`);
+        console.error(`🚨 AI Generation Error (${processingTime}ms):`);
+        console.error(`User: ${userKey?.slice(0, 8)}...`);
+        console.error(`Provider: ${provider}`);
+        console.error(`Prompt length: ${prompt?.length || 0} characters`);
         console.error(`Error type: ${error.constructor.name}`);
         console.error(`Error message: ${error.message}`);
-        console.error(`Full error:`, error);
-        console.error(`Request prompt length: ${prompt?.length || 0} characters`);
-        console.error(`Provider: ${provider}, MaxTokens: ${maxOutputTokens}`);
+        console.error(`Stack trace:`, error.stack);
 
+        // Categorize errors for better response
         if (error.message.includes('No API keys')) {
             return res.status(503).json({ success: false, error: error.message });
         }
         if (error.message.includes('not yet supported')) {
             return res.status(400).json({ success: false, error: error.message });
         }
+        if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+            return res.status(408).json({ success: false, error: 'Request timeout. The prompt may be too complex.' });
+        }
+        if (error.message.includes('quota') || error.message.includes('rate limit')) {
+            return res.status(429).json({ success: false, error: 'API rate limit exceeded. Please try again later.' });
+        }
         
-        // Return more detailed error for debugging
+        // Return detailed error information while preserving original prompt integrity
         const errorDetails = process.env.NODE_ENV === 'development' ? error.message : 'An internal server error occurred.';
-        return res.status(500).json({ success: false, error: errorDetails });
+        return res.status(500).json({ 
+            success: false, 
+            error: errorDetails,
+            debugInfo: {
+                promptLength: prompt?.length || 0,
+                provider: provider,
+                processingTime: processingTime
+            }
+        });
     }
 });
 
