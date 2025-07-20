@@ -221,7 +221,7 @@ class PaymentService {
             const paymentId = uuidv4();
             const orderCode = Date.now(); // Unique order code for PayOS
             const transferContent = this.generateTransferContent(userKey, paymentId);
-            const description = `Nạp ${creditAmount} credit - ${transferContent}`;
+            const description = `Nap ${creditAmount} credit`; // Max 25 chars for PayOS
             
             const paymentData = {
                 amount: price,
