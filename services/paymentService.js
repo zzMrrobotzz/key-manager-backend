@@ -205,15 +205,22 @@ class PaymentService {
                 throw new Error('Unable to get price for credit amount');
             }
 
-            // Check for existing active payment
+            // Check for existing active payment with PayOS data
             const existingPayment = await Payment.findActivePayment(userKey, creditAmount);
-            if (existingPayment) {
-                // Return existing payment if still valid
+            if (existingPayment && existingPayment.paymentData.payosPaymentLinkId) {
+                // Return existing PayOS payment if still valid
                 return {
                     success: true,
                     payment: existingPayment,
                     payUrl: existingPayment.paymentData.payUrl,
-                    qrData: existingPayment.paymentData.qrCode
+                    qrData: existingPayment.paymentData.qrCode,
+                    transferInfo: {
+                        accountNumber: this.bankInfo.accountNumber,
+                        accountName: this.bankInfo.accountName,
+                        bankName: this.bankInfo.bankName,
+                        amount: existingPayment.price,
+                        content: existingPayment.paymentData.transferContent
+                    }
                 };
             }
 
