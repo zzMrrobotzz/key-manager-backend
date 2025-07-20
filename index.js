@@ -248,7 +248,7 @@ app.post('/api/ai/generate', async (req, res) => {
 
         // Get AI generation settings from database
         const Settings = require('./models/Settings');
-        const maxOutputTokens = await Settings.getSetting('aiMaxOutputTokens', 8192);
+        const maxOutputTokens = await Settings.getSetting('aiMaxOutputTokens', 32768);
         const temperature = await Settings.getSetting('aiTemperature', 0.7);
         const topP = await Settings.getSetting('aiTopP', 0.8);
         const topK = await Settings.getSetting('aiTopK', 40);
@@ -320,7 +320,12 @@ app.post('/api/ai/generate', async (req, res) => {
             await Key.findByIdAndUpdate(updatedKey._id, { $inc: { credit: 1 } });
         }
         
-        console.error(`AI Generation Error for key ${userKey}: ${error.message}`);
+        console.error(`🚨 AI Generation Error for key ${userKey}:`);
+        console.error(`Error type: ${error.constructor.name}`);
+        console.error(`Error message: ${error.message}`);
+        console.error(`Full error:`, error);
+        console.error(`Request prompt length: ${prompt?.length || 0} characters`);
+        console.error(`Provider: ${provider}, MaxTokens: ${maxOutputTokens}`);
 
         if (error.message.includes('No API keys')) {
             return res.status(503).json({ success: false, error: error.message });
@@ -329,7 +334,9 @@ app.post('/api/ai/generate', async (req, res) => {
             return res.status(400).json({ success: false, error: error.message });
         }
         
-        return res.status(500).json({ success: false, error: 'An internal server error occurred.' });
+        // Return more detailed error for debugging
+        const errorDetails = process.env.NODE_ENV === 'development' ? error.message : 'An internal server error occurred.';
+        return res.status(500).json({ success: false, error: errorDetails });
     }
 });
 
