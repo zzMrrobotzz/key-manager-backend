@@ -7,6 +7,16 @@ const apiProviderSchema = new mongoose.Schema({
   costToday: { type: Number, default: 0 },
   totalRequests: { type: Number, default: 0 },
   lastChecked: { type: Date, default: Date.now },
+  // Enhanced API key tracking
+  keyStatus: [{
+    key: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+    quotaExceeded: { type: Boolean, default: false },
+    lastError: { type: String, default: null },
+    lastErrorTime: { type: Date, default: null },
+    requestCount: { type: Number, default: 0 },
+    lastUsed: { type: Date, default: null }
+  }]
 });
 
 module.exports = mongoose.model('ApiProvider', apiProviderSchema);

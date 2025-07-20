@@ -25,6 +25,7 @@ const settingsRouter = require('./routes/settings');
 
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
+const ApiKeyManager = require('./services/apiKeyManager');
 
 // --- App & Middleware Setup ---
 const app = express();
@@ -253,11 +254,6 @@ app.post('/api/ai/generate', async (req, res) => {
             return res.status(403).json({ message: 'Invalid key, inactive key, or insufficient credits.' });
         }
 
-        const providerDoc = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, "i") } });
-        if (!providerDoc || !providerDoc.apiKeys || providerDoc.apiKeys.length === 0) {
-            throw new Error(`No API keys configured for provider: ${provider}.`);
-        }
-
         // Get AI generation settings from database
         const Settings = require('./models/Settings');
         const maxOutputTokens = await Settings.getSetting('aiMaxOutputTokens', 32768);
@@ -267,7 +263,14 @@ app.post('/api/ai/generate', async (req, res) => {
         
         console.log(`⚙️ AI Settings: maxTokens=${maxOutputTokens}, temp=${temperature}, topP=${topP}, topK=${topK}`);
 
-        const apiKey = providerDoc.apiKeys[Math.floor(Math.random() * providerDoc.apiKeys.length)];
+        // Use smart API key selection with failover
+        let apiKey;
+        try {
+            apiKey = await ApiKeyManager.getBestApiKey(provider);
+        } catch (keyError) {
+            console.error(`❌ API Key Manager Error: ${keyError.message}`);
+            throw keyError;
+        }
         
         let generatedText;
         switch (provider.toLowerCase()) {
@@ -330,6 +333,9 @@ app.post('/api/ai/generate', async (req, res) => {
         const processingTime = Date.now() - startTime;
         console.log(`✅ AI Generation success: ${generatedText?.length || 0} chars in ${processingTime}ms`);
         
+        // Mark API key as successfully used
+        await ApiKeyManager.markKeyUsed(provider, apiKey);
+        
         return res.json({ success: true, text: generatedText, remainingCredits: updatedKey.credit });
 
     } catch (error) {
@@ -347,8 +353,19 @@ app.post('/api/ai/generate', async (req, res) => {
         console.error(`Error message: ${error.message}`);
         console.error(`Stack trace:`, error.stack);
 
+        // Mark API key error if we have an apiKey
+        if (apiKey) {
+            if (error.message.includes('429') || error.message.includes('quota')) {
+                await ApiKeyManager.markKeyError(provider, apiKey, 'quota_exceeded', error.message);
+            } else if (error.message.includes('401') || error.message.includes('invalid')) {
+                await ApiKeyManager.markKeyError(provider, apiKey, 'invalid_key', error.message);
+            } else {
+                await ApiKeyManager.markKeyError(provider, apiKey, 'general_error', error.message);
+            }
+        }
+
         // Categorize errors for better response
-        if (error.message.includes('No API keys')) {
+        if (error.message.includes('No API keys') || error.message.includes('exhausted')) {
             return res.status(503).json({ success: false, error: error.message });
         }
         if (error.message.includes('not yet supported')) {
@@ -357,7 +374,7 @@ app.post('/api/ai/generate', async (req, res) => {
         if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
             return res.status(408).json({ success: false, error: 'Request timeout. The prompt may be too complex.' });
         }
-        if (error.message.includes('quota') || error.message.includes('rate limit')) {
+        if (error.message.includes('quota') || error.message.includes('rate limit') || error.message.includes('429')) {
             return res.status(429).json({ success: false, error: 'API rate limit exceeded. Please try again later.' });
         }
         
@@ -372,6 +389,35 @@ app.post('/api/ai/generate', async (req, res) => {
                 processingTime: processingTime
             }
         });
+    }
+});
+
+// API Key Management Stats
+app.get('/api/providers/:provider/key-stats', async (req, res) => {
+    try {
+        const { provider } = req.params;
+        const stats = await ApiKeyManager.getKeyStatistics(provider);
+        
+        if (!stats) {
+            return res.status(404).json({ success: false, error: 'Provider not found' });
+        }
+        
+        res.json({ success: true, stats });
+    } catch (error) {
+        console.error('Error getting key stats:', error);
+        res.status(500).json({ success: false, error: 'Failed to get key statistics' });
+    }
+});
+
+// Reset API Key Quotas (admin endpoint)
+app.post('/api/providers/:provider/reset-quotas', async (req, res) => {
+    try {
+        const { provider } = req.params;
+        await ApiKeyManager.resetDailyQuotas(provider);
+        res.json({ success: true, message: `Quotas reset for ${provider}` });
+    } catch (error) {
+        console.error('Error resetting quotas:', error);
+        res.status(500).json({ success: false, error: 'Failed to reset quotas' });
     }
 });
 
