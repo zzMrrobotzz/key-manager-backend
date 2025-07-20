@@ -230,13 +230,13 @@ class PaymentService {
     /**
      * Generate payment URL (fallback to manual transfer if PayOS fails)
      */
-    generatePaymentUrl(paymentData) {
+    generatePaymentUrl(paymentData, bankInfo) {
         // Fallback manual transfer URL
         const params = new URLSearchParams({
             amount: paymentData.amount,
             content: paymentData.transferContent,
-            account: this.bankInfo.accountNumber,
-            bank: this.bankInfo.bankName
+            account: bankInfo.accountNumber,
+            bank: bankInfo.bankName
         });
         
         return `https://your-manual-payment-page.com/pay?${params.toString()}`;
@@ -245,9 +245,9 @@ class PaymentService {
     /**
      * Generate QR code data (fallback for manual transfer)
      */
-    generateQRData(paymentData) {
+    generateQRData(paymentData, bankInfo) {
         // Vietnam QR Pay format for manual transfer
-        return `2|010|${this.bankInfo.accountNumber}|${this.bankInfo.accountName}|${this.bankInfo.bankName}|${paymentData.amount}|${paymentData.transferContent}|VN`;
+        return `2|010|${bankInfo.accountNumber}|${bankInfo.accountName}|${bankInfo.bankName}|${paymentData.amount}|${paymentData.transferContent}|VN`;
     }
 
     /**
@@ -316,7 +316,7 @@ class PaymentService {
             const paymentData = {
                 amount: price,
                 transferContent,
-                bankAccount: this.bankInfo.accountNumber,
+                bankAccount: bankInfo.accountNumber,
                 payUrl: '',
                 qrCode: '',
                 orderCode: orderCode,
@@ -339,8 +339,8 @@ class PaymentService {
             } catch (payosError) {
                 console.warn('PayOS payment creation failed, falling back to manual transfer:', payosError.message);
                 // Fallback to manual transfer
-                paymentData.payUrl = this.generatePaymentUrl(paymentData);
-                paymentData.qrCode = this.generateQRData(paymentData);
+                paymentData.payUrl = this.generatePaymentUrl(paymentData, bankInfo);
+                paymentData.qrCode = this.generateQRData(paymentData, bankInfo);
             }
 
             const payment = new Payment({
