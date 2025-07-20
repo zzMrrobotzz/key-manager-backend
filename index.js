@@ -19,6 +19,7 @@ const adminKeysRouter = require('./routes/adminKeys');
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
 const packagesRouter = require('./routes/packages');
+const mockPayOSRouter = require('./routes/mockPayOS');
 
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
@@ -272,6 +273,7 @@ app.use('/api/admin/keys', adminKeysRouter);
 app.use('/api/admin/proxies', adminProxiesRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/packages', packagesRouter);
+app.use('/api/mock-payos', mockPayOSRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
