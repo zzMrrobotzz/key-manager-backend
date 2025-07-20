@@ -5,6 +5,14 @@ const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const axios = require('axios');
 
+// Import PayOS SDK
+let PayOS;
+try {
+    PayOS = require('@payos/node');
+} catch (error) {
+    console.warn('PayOS SDK not installed, using fallback mode');
+}
+
 class PaymentService {
     constructor() {
         // PayOS Configuration
@@ -14,6 +22,15 @@ class PaymentService {
             checksumKey: process.env.PAYOS_CHECKSUM_KEY || '271d878407a1020d240d9064d0bfb4300bfe2e02bf997bb28771dea73912bd55',
             baseUrl: 'https://api-merchant.payos.vn'
         };
+
+        // Initialize PayOS SDK if available
+        if (PayOS) {
+            this.payOSClient = new PayOS(
+                this.payos.clientId,
+                this.payos.apiKey,
+                this.payos.checksumKey
+            );
+        }
 
         // Fallback bank info for manual transfer
         this.bankInfo = {
@@ -104,47 +121,39 @@ class PaymentService {
      */
     async createPayOSPayment(orderCode, amount, description, returnUrl = '', cancelUrl = '') {
         try {
-            const paymentData = {
-                orderCode: parseInt(orderCode),
-                amount: parseInt(amount),
-                description: description,
-                items: [
-                    {
-                        name: "Nạp credit",
-                        quantity: 1,
-                        price: parseInt(amount)
-                    }
-                ],
-                returnUrl: returnUrl || 'https://toolviettruyen.netlify.app/return',
-                cancelUrl: cancelUrl || 'https://toolviettruyen.netlify.app/cancel'
-            };
+            // Use PayOS SDK if available
+            if (this.payOSClient) {
+                const paymentData = {
+                    orderCode: parseInt(orderCode),
+                    amount: parseInt(amount),
+                    description: description,
+                    items: [
+                        {
+                            name: "Nạp credit",
+                            quantity: 1,
+                            price: parseInt(amount)
+                        }
+                    ],
+                    returnUrl: returnUrl || 'https://toolviettruyen.netlify.app/return',
+                    cancelUrl: cancelUrl || 'https://toolviettruyen.netlify.app/cancel'
+                };
 
-            // Create signature
-            const signature = this.generatePayOSSignature(paymentData);
-
-            const response = await axios.post(`${this.payos.baseUrl}/v2/payment-requests`, paymentData, {
-                headers: {
-                    'x-client-id': this.payos.clientId,
-                    'x-api-key': this.payos.apiKey,
-                    'x-signature': signature,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.data.code === '00') {
+                console.log('Using PayOS SDK to create payment:', paymentData);
+                const paymentLinkRes = await this.payOSClient.createPaymentLink(paymentData);
+                
                 return {
                     success: true,
-                    paymentLinkId: response.data.data.paymentLinkId,
-                    checkoutUrl: response.data.data.checkoutUrl,
-                    qrCode: response.data.data.qrCode
+                    paymentLinkId: paymentLinkRes.paymentLinkId,
+                    checkoutUrl: paymentLinkRes.checkoutUrl,
+                    qrCode: paymentLinkRes.qrCode
                 };
             } else {
-                throw new Error(`PayOS API Error: ${response.data.desc || 'Unknown error'}`);
+                throw new Error('PayOS SDK not available');
             }
 
         } catch (error) {
-            console.error('PayOS payment creation error:', error.response?.data || error.message);
-            throw new Error(`Failed to create PayOS payment: ${error.response?.data?.desc || error.message}`);
+            console.error('PayOS payment creation error:', error.message || error);
+            throw new Error(`Failed to create PayOS payment: ${error.message || error}`);
         }
     }
 
