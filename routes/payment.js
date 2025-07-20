@@ -236,6 +236,27 @@ router.post('/check-payos/:orderCode', async (req, res) => {
     }
 });
 
+// POST /api/payment/setup-webhook - Setup PayOS webhook URL
+router.post('/setup-webhook', async (req, res) => {
+    try {
+        const webhookUrl = 'https://key-manager-backend.onrender.com/api/payment/webhook/payos';
+        const result = await paymentService.setupWebhook(webhookUrl);
+        
+        return res.json({
+            success: true,
+            message: 'Webhook setup initiated',
+            result
+        });
+
+    } catch (error) {
+        console.error('Setup webhook error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to setup webhook'
+        });
+    }
+});
+
 // POST /api/payment/webhook/payos - Webhook cho PayOS
 router.post('/webhook/payos', async (req, res) => {
     try {

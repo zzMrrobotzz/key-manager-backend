@@ -43,6 +43,26 @@ class PaymentService {
     }
 
     /**
+     * Setup PayOS webhook URL
+     */
+    async setupWebhook(webhookUrl) {
+        try {
+            if (this.payOSClient && this.payOSClient.confirmWebhook) {
+                console.log('Setting up PayOS webhook:', webhookUrl);
+                const result = await this.payOSClient.confirmWebhook(webhookUrl);
+                console.log('PayOS webhook setup result:', result);
+                return result;
+            } else {
+                console.warn('PayOS SDK not available or confirmWebhook method not found');
+                return { success: false, message: 'PayOS SDK not available' };
+            }
+        } catch (error) {
+            console.error('Setup webhook error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Get active bank info from database
      */
     async getBankInfo() {
