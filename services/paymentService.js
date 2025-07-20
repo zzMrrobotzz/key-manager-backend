@@ -279,27 +279,33 @@ class PaymentService {
                 throw new Error('Unable to get price for credit amount');
             }
 
-            // Get bank info from database
+            // Get bank info from database - ALWAYS fresh from DB
             const bankInfo = await this.getBankInfo();
+            console.log('💳 Using bank info for payment:', {
+                bankName: bankInfo.bankName,
+                accountNumber: bankInfo.accountNumber,
+                accountName: bankInfo.accountName
+            });
 
-            // Check for existing active payment with PayOS data
-            const existingPayment = await Payment.findActivePayment(userKey, creditAmount);
-            if (existingPayment && existingPayment.paymentData.payosPaymentLinkId) {
-                // Return existing PayOS payment if still valid
-                return {
-                    success: true,
-                    payment: existingPayment,
-                    payUrl: existingPayment.paymentData.payUrl,
-                    qrData: existingPayment.paymentData.qrCode,
-                    transferInfo: {
-                        accountNumber: bankInfo.accountNumber,
-                        accountName: bankInfo.accountName,
-                        bankName: bankInfo.bankName,
-                        amount: existingPayment.price,
-                        content: existingPayment.paymentData.transferContent
-                    }
-                };
-            }
+            // ⚡ TEMPORARILY DISABLED: Skip existing payment check to always use fresh bank info
+            // const existingPayment = await Payment.findActivePayment(userKey, creditAmount);
+            // if (existingPayment && existingPayment.paymentData.payosPaymentLinkId) {
+            //     console.log('🔄 Found existing payment, but will use current bank info');
+            //     return {
+            //         success: true,
+            //         payment: existingPayment,
+            //         payUrl: existingPayment.paymentData.payUrl,
+            //         qrData: existingPayment.paymentData.qrCode,
+            //         transferInfo: {
+            //             accountNumber: bankInfo.accountNumber,
+            //             accountName: bankInfo.accountName,
+            //             bankName: bankInfo.bankName,
+            //             amount: existingPayment.price,
+            //             content: existingPayment.paymentData.transferContent
+            //         }
+            //     };
+            // }
+            console.log('🆕 Creating new payment with fresh bank info');
 
             // Create new payment
             const paymentId = uuidv4();
