@@ -383,4 +383,49 @@ router.post('/cleanup', async (req, res) => {
     }
 });
 
+// POST /api/payment/force-complete/:userKey - Force complete recent payment for debugging
+router.post('/force-complete/:userKey', async (req, res) => {
+    try {
+        const { userKey } = req.params;
+        const Payment = require('../models/Payment');
+        
+        console.log('🔧 Force completing payment for user:', userKey.substring(0, 10) + '...');
+        
+        // Find most recent pending payment for this user
+        const payment = await Payment.findOne({ 
+            userKey, 
+            status: 'pending' 
+        }).sort({ createdAt: -1 });
+        
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                error: 'No pending payment found for this user'
+            });
+        }
+        
+        console.log('📝 Found payment to complete:', payment._id);
+        
+        // Force complete the payment
+        const result = await paymentService.completePayment(payment._id, `MANUAL_FORCE_${Date.now()}`);
+        
+        await createAuditLog('PAYMENT_FORCE_COMPLETED', `Manually force completed payment ${payment._id} for user ${userKey.substring(0, 10)}...`);
+        
+        return res.json({
+            success: true,
+            message: 'Payment force completed successfully',
+            payment: result.payment,
+            newCreditBalance: result.newCreditBalance
+        });
+        
+    } catch (error) {
+        console.error('Force complete payment error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error'
+        });
+    }
+});
+
 module.exports = router;

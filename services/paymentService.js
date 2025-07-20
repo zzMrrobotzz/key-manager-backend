@@ -416,10 +416,19 @@ class PaymentService {
      */
     async completePayment(paymentId, transactionId = null) {
         try {
+            console.log('🔄 Starting payment completion for:', paymentId);
+            
             const payment = await Payment.findById(paymentId);
             if (!payment) {
                 throw new Error('Payment not found');
             }
+            
+            console.log('📋 Payment details:', {
+                id: payment._id,
+                userKey: payment.userKey.substring(0, 10) + '...',
+                creditAmount: payment.creditAmount,
+                status: payment.status
+            });
 
             if (payment.status !== 'pending') {
                 throw new Error('Payment is not in pending status');
@@ -435,10 +444,15 @@ class PaymentService {
             if (!key) {
                 throw new Error('User key not found');
             }
+            
+            console.log('💰 Current user credit:', key.credit);
+            console.log('➕ Adding credit amount:', payment.creditAmount);
 
-            await Key.findByIdAndUpdate(key._id, {
+            const updateResult = await Key.findByIdAndUpdate(key._id, {
                 $inc: { credit: payment.creditAmount }
-            });
+            }, { new: true });
+            
+            console.log('✅ Updated user credit:', updateResult.credit);
 
             // Mark payment as completed
             await payment.markAsCompleted(transactionId || `MANUAL_${Date.now()}`);
@@ -448,11 +462,11 @@ class PaymentService {
             return {
                 success: true,
                 payment,
-                newCreditBalance: key.credit + payment.creditAmount
+                newCreditBalance: updateResult.credit
             };
 
         } catch (error) {
-            console.error('Payment completion error:', error);
+            console.error('❌ Payment completion error:', error);
             throw error;
         }
     }
