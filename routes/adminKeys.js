@@ -8,24 +8,51 @@ const generateKey = () => 'KEY-' + Math.random().toString(36).substr(2, 8).toUpp
 
 // POST / - Tạo key mới
 router.post('/', async (req, res) => {
-    const { expiredAt, maxActivations, note, credit } = req.body;
-    const newKeyString = generateKey();
-    const newKey = new Key({
-        key: newKeyString,
-        expiredAt,
-        maxActivations,
-        note,
-        credit: typeof credit === 'number' ? credit : 0,
-    });
-    await newKey.save();
-    await createAuditLog('CREATE_KEY', `Key ${newKeyString} created with ${credit || 0} credit.`, 'Admin');
-    res.status(201).json(newKey);
+    try {
+        const { expiredAt, maxActivations, note, credit } = req.body;
+        const newKeyString = generateKey();
+        const newKey = new Key({
+            key: newKeyString,
+            expiredAt,
+            maxActivations,
+            note,
+            credit: typeof credit === 'number' ? credit : 0,
+        });
+        await newKey.save();
+        await createAuditLog('CREATE_KEY', `Key ${newKeyString} created with ${credit || 0} credit.`, 'Admin');
+        
+        console.log('✅ Created new key:', newKeyString);
+        res.status(201).json({
+            success: true,
+            key: newKey
+        });
+    } catch (error) {
+        console.error('❌ Error creating key:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create key'
+        });
+    }
 });
 
 // GET / - Lấy danh sách key
 router.get('/', async (req, res) => {
-    const keys = await Key.find().sort({ createdAt: -1 });
-    res.json(keys);
+    try {
+        console.log('📋 Loading admin keys...');
+        const keys = await Key.find().sort({ createdAt: -1 });
+        console.log(`✅ Loaded ${keys.length} keys`);
+        
+        res.json({
+            success: true,
+            keys: keys
+        });
+    } catch (error) {
+        console.error('❌ Error loading admin keys:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to load keys'
+        });
+    }
 });
 
 // PUT /:id/details - Cập nhật chi tiết key (note, expiredAt, credit...)
