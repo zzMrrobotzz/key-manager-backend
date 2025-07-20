@@ -17,7 +17,7 @@ router.post('/create', async (req, res) => {
             price
         } = req.body;
 
-        console.log('Payment request received:', req.body);
+        console.log('📝 Payment request received:', req.body);
 
         // ✅ FIXED: Validate key
         if (!key || typeof key !== 'string' || key.trim() === '') {
@@ -27,19 +27,22 @@ router.post('/create', async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Extract credit amount from any field
-        const finalCreditAmount = creditAmount || credit || credits || amount;
+        // ✅ FIXED: Extract credit amount from any field and convert to number
+        const rawCreditAmount = creditAmount || credit || credits || amount;
+        const finalCreditAmount = parseInt(rawCreditAmount) || parseFloat(rawCreditAmount);
         
         if (!finalCreditAmount || finalCreditAmount <= 0 || isNaN(finalCreditAmount)) {
+            console.log('❌ Invalid credit amount:', { rawCreditAmount, finalCreditAmount });
             return res.status(400).json({
                 success: false,
                 error: 'Valid credit amount is required'
             });
         }
 
-        console.log('Processed payment request:', { 
+        console.log('✅ Processed payment request:', { 
             key: key.substring(0, 10) + '...', 
-            creditAmount: finalCreditAmount 
+            creditAmount: finalCreditAmount,
+            type: typeof finalCreditAmount
         });
 
         // Extract metadata from request
@@ -63,7 +66,8 @@ router.post('/create', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Payment creation error:', error);
+        console.error('❌ Payment creation error:', error);
+        console.error('Error stack:', error.stack);
         
         let statusCode = 500;
         let errorMessage = 'Internal server error';
@@ -78,7 +82,8 @@ router.post('/create', async (req, res) => {
 
         return res.status(statusCode).json({
             success: false,
-            error: errorMessage
+            error: errorMessage,
+            details: error.message
         });
     }
 });

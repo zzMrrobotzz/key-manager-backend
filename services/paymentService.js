@@ -26,11 +26,19 @@ class PaymentService {
 
         // Initialize PayOS SDK if available
         if (PayOS) {
-            this.payOSClient = new PayOS(
-                this.payos.clientId,
-                this.payos.apiKey,
-                this.payos.checksumKey
-            );
+            try {
+                this.payOSClient = new PayOS(
+                    this.payos.clientId,
+                    this.payos.apiKey,
+                    this.payos.checksumKey
+                );
+                console.log('✅ PayOS SDK initialized successfully');
+            } catch (error) {
+                console.error('❌ PayOS SDK initialization failed:', error.message);
+                this.payOSClient = null;
+            }
+        } else {
+            console.warn('❌ PayOS SDK not available');
         }
 
         // Default bank info (will be overridden by database)
@@ -80,6 +88,8 @@ class PaymentService {
      */
     async getPriceForCredit(creditAmount) {
         try {
+            console.log('💰 Getting price for credit amount:', creditAmount);
+            
             // First check if exact package exists
             const creditPackage = await CreditPackage.findOne({ 
                 credits: creditAmount, 
@@ -87,17 +97,22 @@ class PaymentService {
             });
             
             if (creditPackage) {
+                console.log('✅ Found exact package:', { name: creditPackage.name, price: creditPackage.price });
                 return creditPackage.price;
             }
             
             // ✅ FIXED: Fallback price calculation for flexible amounts
             // Use rate: 1 credit = 4545 VNĐ (approximately)
             const fallbackRate = 4545;
-            return creditAmount * fallbackRate;
+            const calculatedPrice = creditAmount * fallbackRate;
+            console.log('⚡ Using fallback rate calculation:', { creditAmount, fallbackRate, price: calculatedPrice });
+            return calculatedPrice;
         } catch (error) {
-            console.error('Error getting price for credit:', error);
+            console.error('❌ Error getting price for credit:', error);
             // Emergency fallback
-            return creditAmount * 4545;
+            const emergencyPrice = creditAmount * 4545;
+            console.log('🆘 Using emergency fallback:', emergencyPrice);
+            return emergencyPrice;
         }
     }
 
@@ -219,6 +234,8 @@ class PaymentService {
      */
     async createPayment(userKey, creditAmount, metadata = {}) {
         try {
+            console.log('🚀 Creating payment:', { userKey: userKey.substring(0, 10) + '...', creditAmount, metadata });
+            
             // Validate inputs
             if (!userKey || !creditAmount) {
                 throw new Error('User key and credit amount are required');
@@ -233,6 +250,8 @@ class PaymentService {
             if (!keyDoc) {
                 throw new Error('Invalid or inactive user key');
             }
+            
+            console.log('✅ User key validated:', userKey.substring(0, 10) + '...');
 
             const price = await this.getPriceForCredit(creditAmount);
             if (!price) {
