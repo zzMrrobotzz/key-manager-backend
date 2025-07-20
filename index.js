@@ -139,30 +139,73 @@ app.post('/api/providers', async (req, res) => {
 // Dashboard Stats
 app.get('/api/stats/dashboard', async (req, res) => {
   try {
+    console.log('📊 Loading dashboard stats...');
+    
+    // Key stats
     const totalKeys = await Key.countDocuments();
     const activeKeys = await Key.countDocuments({ isActive: true });
     const expiredKeys = await Key.countDocuments({ expiredAt: { $lt: new Date() } });
-    
-    const billingResult = await Transaction.aggregate([
-      { $match: { status: 'Success' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
+    const totalCredits = await Key.aggregate([
+      { $group: { _id: null, total: { $sum: '$credit' } } }
     ]);
     
+    // Payment stats (using new Payment model)
+    const totalRevenue = await Payment.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$price' } } }
+    ]);
+    
+    const monthlyTransactions = await Payment.countDocuments({
+      status: 'completed',
+      completedAt: {
+        $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      }
+    });
+    
+    // Today stats
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const todayRevenue = await Payment.aggregate([
+      { 
+        $match: { 
+          status: 'completed',
+          completedAt: { $gte: todayStart }
+        } 
+      },
+      { $group: { _id: null, total: { $sum: '$price' } } }
+    ]);
+    
+    // API usage stats
     const providers = await ApiProvider.find();
     const totalRequests = providers.reduce((sum, p) => sum + (p.totalRequests || 0), 0);
     const costToday = providers.reduce((sum, p) => sum + (p.costToday || 0), 0);
 
-    // Thêm proxy stats
+    // Proxy stats
     const proxyStats = await proxyManager.getProxyStatistics();
+    
+    console.log('✅ Dashboard stats loaded:', {
+      totalKeys,
+      activeKeys,
+      totalRevenue: totalRevenue[0]?.total || 0,
+      monthlyTransactions
+    });
 
     res.json({
+      success: true,
       keyStats: { total: totalKeys, active: activeKeys, expired: expiredKeys },
-      billingStats: { totalRevenue: billingResult[0]?.total || 0, monthlyTransactions: 0 },
+      billingStats: { 
+        totalRevenue: totalRevenue[0]?.total || 0, 
+        monthlyTransactions,
+        todayRevenue: todayRevenue[0]?.total || 0
+      },
       apiUsageStats: { totalRequests, costToday },
-      proxyStats: proxyStats || { overview: {}, topPerformers: [] }
+      proxyStats: proxyStats || { overview: {}, topPerformers: [] },
+      totalCredits: totalCredits[0]?.total || 0
     });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch dashboard stats' });
+    console.error('❌ Error loading dashboard stats:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch dashboard stats' });
   }
 });
 
