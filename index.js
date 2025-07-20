@@ -246,6 +246,13 @@ app.post('/api/ai/generate', async (req, res) => {
             throw new Error(`No API keys configured for provider: ${provider}.`);
         }
 
+        // Get AI generation settings from database
+        const Settings = require('./models/Settings');
+        const maxOutputTokens = await Settings.getSetting('aiMaxOutputTokens', 8192);
+        const temperature = await Settings.getSetting('aiTemperature', 0.7);
+        const topP = await Settings.getSetting('aiTopP', 0.8);
+        const topK = await Settings.getSetting('aiTopK', 40);
+
         const apiKey = providerDoc.apiKeys[Math.floor(Math.random() * providerDoc.apiKeys.length)];
         
         let generatedText;
@@ -266,7 +273,13 @@ app.post('/api/ai/generate', async (req, res) => {
                                 'x-goog-api-key': apiKey
                             },
                             body: JSON.stringify({
-                                contents: [{ parts: [{ text: prompt }] }]
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: {
+                                    maxOutputTokens: maxOutputTokens,
+                                    temperature: temperature,
+                                    topP: topP,
+                                    topK: topK
+                                }
                             })
                         },
                         apiKey
@@ -282,7 +295,15 @@ app.post('/api/ai/generate', async (req, res) => {
                     // Fallback to direct connection nếu không có proxy
                     console.log(`📡 No proxy assigned for API key, using direct connection`);
                     const genAI = new GoogleGenerativeAI(apiKey);
-                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const model = genAI.getGenerativeModel({ 
+                        model: "gemini-1.5-flash",
+                        generationConfig: {
+                            maxOutputTokens: maxOutputTokens,
+                            temperature: temperature,
+                            topP: topP,
+                            topK: topK
+                        }
+                    });
                     const result = await model.generateContent(prompt);
                     generatedText = result.response.text();
                 }
