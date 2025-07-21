@@ -194,10 +194,11 @@ router.post('/ai-keys/test/:provider', isAdmin, async (req, res) => {
       switch (provider.toLowerCase()) {
         case 'gemini':
           // Test Gemini API
-          const { GoogleGenAI } = require('@google/genai');
-          const genAI = new GoogleGenAI({ apiKey: key });
+          const { GoogleGenerativeAI } = require('@google/generative-ai');
+          const genAI = new GoogleGenerativeAI(key);
           const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-          await model.generateContent('Test connection');
+          const result = await model.generateContent('Test connection');
+          await result.response.text(); // Make sure the response can be parsed
           testResult = { valid: true, message: 'Gemini API key is valid' };
           break;
 
