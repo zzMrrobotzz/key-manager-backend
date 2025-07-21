@@ -68,11 +68,13 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
 
     // Kiểm tra provider có key hợp lệ không (sử dụng database thay vì file)
     if (!ApiProvider) {
+      console.log('❌ ApiProvider model not available');
       return res.status(500).json({
         success: false,
         message: 'Database models not available'
       });
     }
+    console.log('✅ ApiProvider model is available');
 
     console.log(`🔍 Searching for provider: ${provider}`);
     const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
@@ -213,11 +215,13 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
 
     // Kiểm tra provider có key hợp lệ không (sử dụng database thay vì file)
     if (!ApiProvider) {
+      console.log('❌ ApiProvider model not available');
       return res.status(500).json({
         success: false,
         message: 'Database models not available'
       });
     }
+    console.log('✅ ApiProvider model is available');
 
     console.log(`🔍 Searching for provider: ${provider}`);
     const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
