@@ -216,28 +216,58 @@ router.post('/generate-image', authenticateUser, aiRequestLimiter, async (req, r
 async function callGeminiAPI(prompt, systemInstruction, apiKey, useGoogleSearch, options) {
   const { GoogleGenAI } = require('@google/genai');
   const genAI = new GoogleGenAI({ apiKey });
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-pro',
-    ...options
-  });
-
+  
+  // ✅ Fix: Sử dụng model mới và config đầy đủ như frontend
+  const MODEL_TEXT = "gemini-2.5-flash-preview-04-17";
+  
   const request = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    model: MODEL_TEXT,
+    contents: { role: 'user', parts: [{ text: prompt }] },
+    config: {
+      generationConfig: {
+        maxOutputTokens: 32768,  // ✅ Quan trọng cho output dài
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40
+      }
+    }
   };
 
   if (systemInstruction) {
-    request.systemInstruction = systemInstruction;
+    request.config.systemInstruction = systemInstruction;
+  }
+
+  // ✅ Fix: Xử lý JSON output option
+  if (options && options.useJsonOutput) {
+    request.config.responseMimeType = "application/json";
   }
 
   if (useGoogleSearch) {
-    request.tools = [{ googleSearch: {} }];
+    request.config.tools = [{ googleSearch: {} }];
+    // Remove responseMimeType if using Google Search
+    if (request.config.responseMimeType === "application/json") {
+      delete request.config.responseMimeType;
+    }
   }
 
-  const result = await model.generateContent(request);
-  const response = await result.response;
+  // ✅ Fix: Sử dụng generateContent API đúng cách như frontend
+  const result = await genAI.models.generateContent(request);
+  
+  let responseText = result.text;
+  
+  // ✅ Fix: Xử lý JSON parsing như frontend nếu cần
+  if (options && options.useJsonOutput) {
+    let jsonStr = responseText.trim();
+    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
+    const match = jsonStr.match(fenceRegex);
+    if (match && match[2]) {
+      jsonStr = match[2].trim();
+    }
+    responseText = jsonStr;
+  }
   
   return {
-    text: response.text(),
+    text: responseText,
     usage: {
       promptTokens: result.usageMetadata?.promptTokenCount || 0,
       completionTokens: result.usageMetadata?.candidatesTokenCount || 0,
@@ -304,13 +334,16 @@ async function callGeminiImageAPI(prompt, aspectRatio, apiKey) {
   const { GoogleGenAI } = require('@google/genai');
   const genAI = new GoogleGenAI({ apiKey });
   
+  // ✅ Fix: Sử dụng model mới cho image generation
+  const MODEL_IMAGE = "gemini-ultra";
+  
   const response = await genAI.models.generateImages({
-    model: 'gemini-pro-vision',
-    prompt,
+    model: MODEL_IMAGE,
+    prompt: prompt, // Use the direct prompt from the user
     config: { 
       numberOfImages: 1, 
       outputMimeType: 'image/png',
-      aspectRatio
+      aspectRatio: aspectRatio // Pass aspectRatio directly in config
     }
   });
 
