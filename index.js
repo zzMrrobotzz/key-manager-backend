@@ -445,6 +445,11 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Increase server timeout for long AI requests (5 minutes)
+server.timeout = 300000; // 300 seconds = 5 minutes
+server.keepAliveTimeout = 300000;
+server.headersTimeout = 305000;
