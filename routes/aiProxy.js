@@ -148,6 +148,54 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
     } catch (aiError) {
       console.error(`AI API error - Provider: ${provider}, Error:`, aiError);
       
+      // ✅ AUTOMATIC FALLBACK: If Gemini fails with quota/rate limit, try DeepSeek
+      const errorMsg = aiError.message.toLowerCase();
+      const isQuotaError = errorMsg.includes('429') || 
+                          errorMsg.includes('too many requests') || 
+                          errorMsg.includes('quota') || 
+                          errorMsg.includes('rate limit');
+      
+      if (provider.toLowerCase() === 'gemini' && isQuotaError) {
+        console.log('🔄 Gemini quota exceeded, attempting DeepSeek fallback...');
+        
+        try {
+          // Check if DeepSeek is available
+          const deepseekProvider = await ApiProvider.findOne({ name: { $regex: new RegExp('^deepseek$', 'i') } });
+          if (deepseekProvider && deepseekProvider.apiKeys && deepseekProvider.apiKeys.length > 0) {
+            const deepseekKey = deepseekProvider.apiKeys[0];
+            console.log('🚀 Using DeepSeek as fallback provider');
+            
+            const fallbackResult = await callDeepSeekAPI(prompt, systemInstruction, deepseekKey, model, options);
+            
+            // Log successful fallback
+            try {
+              await logApiRequest({
+                provider: 'deepseek-fallback',
+                userId,
+                promptLength: prompt.length,
+                responseLength: fallbackResult.text ? fallbackResult.text.length : 0,
+                tokenUsage: fallbackResult.usage || {},
+                success: true,
+                retries: 1,
+                requestType: 'text'
+              });
+            } catch (logError) {
+              console.error('Error logging fallback request:', logError);
+            }
+            
+            return res.json({
+              success: true,
+              text: fallbackResult.text,
+              usage: fallbackResult.usage || null,
+              fallback: 'deepseek' // Indicate this was a fallback
+            });
+          }
+        } catch (fallbackError) {
+          console.error('❌ DeepSeek fallback also failed:', fallbackError);
+          // Continue to log original error and respond with failure
+        }
+      }
+      
       // Log failed request to database
       try {
         await logApiRequest({
