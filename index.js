@@ -247,6 +247,7 @@ app.post('/api/ai/generate', async (req, res) => {
     }
 
     let updatedKey;
+    let apiKey; // Declare apiKey in function scope so catch blocks can access it
     try {
         updatedKey = await Key.findOneAndUpdate(
             { key: userKey, isActive: true, credit: { $gt: 0 } },
@@ -268,7 +269,6 @@ app.post('/api/ai/generate', async (req, res) => {
         console.log(`⚙️ AI Settings: maxTokens=${maxOutputTokens}, temp=${temperature}, topP=${topP}, topK=${topK}`);
 
         // Use smart API key selection with failover
-        let apiKey;
         try {
             apiKey = await ApiKeyManager.getBestApiKey(provider);
         } catch (keyError) {
