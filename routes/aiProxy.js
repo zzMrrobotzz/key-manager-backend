@@ -74,7 +74,10 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
       });
     }
 
+    console.log(`🔍 Searching for provider: ${provider}`);
     const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
+    console.log(`📋 Found provider:`, providerRecord ? {name: providerRecord.name, keyCount: providerRecord.apiKeys?.length} : 'null');
+    
     if (!providerRecord || !providerRecord.apiKeys || providerRecord.apiKeys.length === 0) {
       return res.status(400).json({
         success: false,
@@ -216,7 +219,10 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
       });
     }
 
+    console.log(`🔍 Searching for provider: ${provider}`);
     const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
+    console.log(`📋 Found provider:`, providerRecord ? {name: providerRecord.name, keyCount: providerRecord.apiKeys?.length} : 'null');
+    
     if (!providerRecord || !providerRecord.apiKeys || providerRecord.apiKeys.length === 0) {
       return res.status(400).json({
         success: false,
