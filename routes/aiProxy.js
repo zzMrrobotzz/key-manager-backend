@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser } = require('../middleware/adminAuth');
-const aiKeyManager = require('../services/aiKeyManager');
 const rateLimit = require('express-rate-limit');
 
 // Import logging models (create simplified versions if they don't exist)
@@ -67,12 +66,19 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
       });
     }
 
-    // Kiểm tra provider có key hợp lệ không
-    const hasValidKey = await aiKeyManager.hasValidKey(provider);
-    if (!hasValidKey) {
+    // Kiểm tra provider có key hợp lệ không (sử dụng database thay vì file)
+    if (!ApiProvider) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database models not available'
+      });
+    }
+
+    const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
+    if (!providerRecord || !providerRecord.apiKeys || providerRecord.apiKeys.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `Provider ${provider} is not available or has invalid API key`
+        message: `Provider ${provider} is not available or has no API keys`
       });
     }
 
@@ -85,8 +91,8 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
     //   });
     // }
 
-    // Lấy API key
-    const apiKey = await aiKeyManager.getKey(provider);
+    // Lấy API key từ database (sử dụng key đầu tiên)
+    const apiKey = providerRecord.apiKeys[0];
 
     // Gọi AI provider tương ứng
     let result;
@@ -202,12 +208,19 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
       });
     }
 
-    // Kiểm tra provider có key hợp lệ không
-    const hasValidKey = await aiKeyManager.hasValidKey(provider);
-    if (!hasValidKey) {
+    // Kiểm tra provider có key hợp lệ không (sử dụng database thay vì file)
+    if (!ApiProvider) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database models not available'
+      });
+    }
+
+    const providerRecord = await ApiProvider.findOne({ name: { $regex: new RegExp(`^${provider}$`, 'i') } });
+    if (!providerRecord || !providerRecord.apiKeys || providerRecord.apiKeys.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `Provider ${provider} is not available or has invalid API key`
+        message: `Provider ${provider} is not available or has no API keys`
       });
     }
 
@@ -220,8 +233,8 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
     //   });
     // }
 
-    // Lấy API key
-    const apiKey = await aiKeyManager.getKey(provider);
+    // Lấy API key từ database (sử dụng key đầu tiên)
+    const apiKey = providerRecord.apiKeys[0];
 
     // Gọi AI provider cho image generation
     let result;
