@@ -231,6 +231,7 @@ app.get('/api/audit-log', async (req, res) => {
 });
 
 // AI Proxy Endpoint - ENHANCED WITH BETTER ERROR HANDLING
+/* OLD ENDPOINT - DISABLED to prevent conflict with aiProxy.js
 app.post('/api/ai/generate', async (req, res) => {
     const startTime = Date.now();
     const { prompt, provider } = req.body;
@@ -395,6 +396,7 @@ app.post('/api/ai/generate', async (req, res) => {
         });
     }
 });
+*/
 
 // API Key Management Stats
 app.get('/api/providers/:provider/key-stats', async (req, res) => {
