@@ -294,46 +294,24 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
 
 // Helper functions để gọi các AI provider
 async function callGeminiAPI(prompt, systemInstruction, apiKey, useGoogleSearch, options) {
-  const { GoogleGenAI } = require('@google/genai');
-  const genAI = new GoogleGenAI({ apiKey });
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
   
-  // ✅ Fix: Sử dụng Gemini 2.5 Flash stable với 1,500 requests/ngày
-  const MODEL_TEXT = "gemini-2.5-flash";
-  
-  const request = {
-    model: MODEL_TEXT,
-    contents: { role: 'user', parts: [{ text: prompt }] },
-    config: {
-      generationConfig: {
-        maxOutputTokens: 32768,  // ✅ Quan trọng cho output dài
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40
-      }
+  // ✅ Fix: Sử dụng Gemini 1.5 Flash stable (tương tự index.js)
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      maxOutputTokens: 32768,
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40
     }
-  };
+  });
 
-  if (systemInstruction) {
-    request.config.systemInstruction = systemInstruction;
-  }
-
-  // ✅ Fix: Xử lý JSON output option
-  if (options && options.useJsonOutput) {
-    request.config.responseMimeType = "application/json";
-  }
-
-  if (useGoogleSearch) {
-    request.config.tools = [{ googleSearch: {} }];
-    // Remove responseMimeType if using Google Search
-    if (request.config.responseMimeType === "application/json") {
-      delete request.config.responseMimeType;
-    }
-  }
-
-  // ✅ Fix: Sử dụng generateContent API đúng cách như frontend
-  const result = await genAI.models.generateContent(request);
+  // ✅ Fix: Sử dụng generateContent API như trong index.js
+  const result = await model.generateContent(prompt);
   
-  let responseText = result.text;
+  let responseText = result.response.text();
   
   // ✅ Fix: Xử lý JSON parsing như frontend nếu cần
   if (options && options.useJsonOutput) {
@@ -411,8 +389,8 @@ async function callDeepSeekAPI(prompt, systemInstruction, apiKey, model = 'deeps
 }
 
 async function callGeminiImageAPI(prompt, aspectRatio, apiKey) {
-  const { GoogleGenAI } = require('@google/genai');
-  const genAI = new GoogleGenAI({ apiKey });
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
   
   // ✅ Fix: Sử dụng model mới cho image generation
   const MODEL_IMAGE = "gemini-ultra";
