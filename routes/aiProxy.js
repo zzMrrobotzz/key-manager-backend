@@ -260,8 +260,8 @@ async function callGeminiAPI(prompt, systemInstruction, apiKey, useGoogleSearch,
   const { GoogleGenAI } = require('@google/genai');
   const genAI = new GoogleGenAI({ apiKey });
   
-  // ✅ Fix: Sử dụng model mới và config đầy đủ như frontend
-  const MODEL_TEXT = "gemini-2.5-flash-preview-04-17";
+  // ✅ Fix: Sử dụng Gemini 2.5 Flash stable với 1,500 requests/ngày
+  const MODEL_TEXT = "gemini-2.5-flash";
   
   const request = {
     model: MODEL_TEXT,
