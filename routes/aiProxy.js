@@ -47,12 +47,19 @@ router.get('/providers', async (req, res) => {
 });
 
 // POST /ai/generate - Proxy AI text generation
-router.post('/generate', authenticateUser, aiRequestLimiter, async (req, res) => {
+router.post('/generate', aiRequestLimiter, async (req, res) => {
   try {
     const { prompt, systemInstruction, provider, model, useGoogleSearch, options } = req.body;
-    const userId = req.user.key; // Lấy user key từ token
+    const userId = req.headers.authorization?.split(' ')[1]; // Lấy user key từ authorization header
 
     // Validate input
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization header is required'
+      });
+    }
+
     if (!prompt || !provider) {
       return res.status(400).json({
         success: false,
@@ -166,12 +173,19 @@ router.post('/generate', authenticateUser, aiRequestLimiter, async (req, res) =>
 });
 
 // POST /ai/generate-image - Proxy AI image generation
-router.post('/generate-image', authenticateUser, aiRequestLimiter, async (req, res) => {
+router.post('/generate-image', aiRequestLimiter, async (req, res) => {
   try {
     const { prompt, aspectRatio, provider } = req.body;
-    const userId = req.user.key;
+    const userId = req.headers.authorization?.split(' ')[1]; // Lấy user key từ authorization header
 
     // Validate input
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization header is required'
+      });
+    }
+
     if (!prompt || !provider) {
       return res.status(400).json({
         success: false,
