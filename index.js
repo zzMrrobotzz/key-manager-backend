@@ -23,6 +23,10 @@ const mockPayOSRouter = require('./routes/mockPayOS');
 const bankInfoRouter = require('./routes/bankInfo');
 const settingsRouter = require('./routes/settings');
 
+// Import new routes
+const adminStatsRouter = require('./routes/adminStats');
+const aiProxyRouter = require('./routes/aiProxy');
+
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
 const ApiKeyManager = require('./services/apiKeyManager');
@@ -430,6 +434,10 @@ app.use('/api/packages', packagesRouter);
 app.use('/api/mock-payos', mockPayOSRouter);
 app.use('/api/bank-info', bankInfoRouter);
 app.use('/api/settings', settingsRouter);
+
+// Mount new routes
+app.use('/api/admin/stats', adminStatsRouter);
+app.use('/api/ai', aiProxyRouter);
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {

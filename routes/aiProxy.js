@@ -4,6 +4,15 @@ const { authenticateUser } = require('../middleware/adminAuth');
 const aiKeyManager = require('../services/aiKeyManager');
 const rateLimit = require('express-rate-limit');
 
+// Import logging models (create simplified versions if they don't exist)
+let ApiRequestLog, ApiProvider;
+try {
+  ApiRequestLog = require('../models/ApiRequestLog');
+  ApiProvider = require('../models/ApiProvider');
+} catch (err) {
+  console.log('⚠️ Logging models not found, statistics will be disabled');
+}
+
 // Rate limiting cho AI requests
 const aiRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
@@ -95,6 +104,23 @@ router.post('/generate', authenticateUser, aiRequestLimiter, async (req, res) =>
       // Log request thành công
       console.log(`AI request successful - User: ${userId}, Provider: ${provider}, Prompt length: ${prompt.length}`);
 
+      // Log to database for statistics
+      try {
+        await logApiRequest({
+          provider,
+          userId,
+          promptLength: prompt.length,
+          responseLength: result.text ? result.text.length : 0,
+          tokenUsage: result.usage || {},
+          success: true,
+          retries: 0,
+          requestType: 'text'
+        });
+      } catch (logError) {
+        console.error('Error logging request:', logError);
+        // Don't fail the request if logging fails
+      }
+
       res.json({
         success: true,
         text: result.text,
@@ -103,6 +129,23 @@ router.post('/generate', authenticateUser, aiRequestLimiter, async (req, res) =>
 
     } catch (aiError) {
       console.error(`AI API error - Provider: ${provider}, Error:`, aiError);
+      
+      // Log failed request to database
+      try {
+        await logApiRequest({
+          provider,
+          userId,
+          promptLength: prompt.length,
+          responseLength: 0,
+          tokenUsage: {},
+          success: false,
+          error: aiError.message,
+          retries: 0,
+          requestType: 'text'
+        });
+      } catch (logError) {
+        console.error('Error logging failed request:', logError);
+      }
       
       // TODO: Hoàn trả credit nếu có lỗi
       // await refundCredit(userId, 1);
@@ -385,6 +428,46 @@ async function callStabilityImageAPI(prompt, aspectRatio, apiKey) {
     };
   } else {
     throw new Error('No image data received from Stability API');
+  }
+}
+
+// Helper function to log API requests (optional if models exist)
+async function logApiRequest(logData) {
+  if (!ApiRequestLog || !ApiProvider) return; // Skip if models not available
+  
+  try {
+    const requestLog = new ApiRequestLog({
+      provider: logData.provider,
+      userId: logData.userId,
+      promptLength: logData.promptLength || 0,
+      responseLength: logData.responseLength || 0,
+      tokenUsage: {
+        promptTokens: logData.tokenUsage?.promptTokens || 0,
+        completionTokens: logData.tokenUsage?.completionTokens || 0,
+        totalTokens: logData.tokenUsage?.totalTokens || 0
+      },
+      success: logData.success,
+      error: logData.error || null,
+      retries: logData.retries || 0,
+      requestType: logData.requestType || 'text'
+    });
+
+    await requestLog.save();
+
+    // Also update provider statistics
+    if (logData.success) {
+      await ApiProvider.findOneAndUpdate(
+        { name: logData.provider },
+        { 
+          $inc: { totalRequests: 1 },
+          lastChecked: new Date()
+        },
+        { upsert: true }
+      );
+    }
+  } catch (error) {
+    console.error('Error logging API request:', error);
+    // Don't fail the main request if logging fails
   }
 }
 
